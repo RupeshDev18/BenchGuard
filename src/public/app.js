@@ -35,6 +35,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initModalControls();
   initActions();
   loadRunHistory();
+  initAnalytics();
+  checkDatabaseStatus();
 });
 
 // -------------------------------------------------------------
@@ -121,6 +123,7 @@ function initTabs() {
       if (targetContent) targetContent.classList.add("active");
 
       if (tab.dataset.tab === "history") loadRunHistory();
+      if (tab.dataset.tab === "analytics") loadAnalytics();
       if (tab.dataset.tab === "managementReport") refreshIframes();
       if (tab.dataset.tab === "allureReport") refreshIframes();
       if (tab.dataset.tab === "studio") drawLoadCurve();
@@ -1306,6 +1309,7 @@ function handleWebSocketMessage(msg) {
     case "init":
       if (msg.data.running) setPipelineRunningState(true);
       if (msg.data.mockRunning !== undefined) updateMockServerUI(msg.data.mockRunning);
+      if (msg.data.dbStatus) updateDbStatusUI(msg.data.dbStatus);
       break;
 
     case "pipeline_started":
@@ -1320,7 +1324,16 @@ function handleWebSocketMessage(msg) {
       appendLogLine(`[system] 🏁 Pipeline finished with exit code ${msg.data.exitCode} — ${verdict}`, isPassed ? "success" : "stderr");
       showToast(verdict, isPassed ? "success" : "error", "Benchmark Completed");
       loadRunHistory();
+      loadAnalytics();
       refreshIframes();
+      break;
+
+    case "run_saved":
+      if (msg.data.storedInPostgres) {
+        showToast("Test run metrics & timeseries saved to PostgreSQL", "success", "🐘 Database Saved");
+      }
+      loadRunHistory();
+      loadAnalytics();
       break;
 
     case "pipeline_aborted":
@@ -1392,14 +1405,15 @@ function appendLogLine(text, cssClass = "") {
 async function loadRunHistory() {
   try {
     const res = await fetch("/api/runs");
-    const history = await res.json();
+    const data = await res.json();
+    const history = Array.isArray(data) ? data : (data.runs || []);
     const tbody = document.getElementById("historyTableBody");
     tbody.innerHTML = "";
 
     if (!Array.isArray(history) || history.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">
+          <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 30px;">
             No runs recorded yet. Execute a load test to generate history.
           </td>
         </tr>
@@ -1412,6 +1426,7 @@ async function loadRunHistory() {
       const d = new Date(run.date);
       const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       const dateStr = d.toLocaleDateString();
+      const isPg = run.source === "postgresql" || run.storedInPostgres;
 
       tr.innerHTML = `
         <td>${dateStr} ${timeStr}</td>
@@ -1427,12 +1442,444 @@ async function loadRunHistory() {
         <td style="color: ${run.p95 > 500 ? "var(--danger)" : "inherit"};">${Math.round(run.p95)} ms</td>
         <td style="color: ${run.p99 > 1000 ? "var(--danger)" : "inherit"};">${Math.round(run.p99)} ms</td>
         <td style="color: ${run.errorRate > 1 ? "var(--danger)" : "inherit"};">${run.errorRate}%</td>
+        <td>
+          <span class="badge ${isPg ? "badge-primary" : ""}" title="${isPg ? "Stored in PostgreSQL" : "Local File Backup"}">
+            ${isPg ? "🐘 Postgres" : "📁 File"}
+          </span>
+        </td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="inspectRun('${run.id}')" title="Inspect Dynamic Timeseries Graphs" style="padding: 3px 8px; font-size: 11px;">
+            📈 Inspect
+          </button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
   } catch (err) {
     console.error("Failed loading history:", err);
   }
+}
+
+// -------------------------------------------------------------
+// 14. PostgreSQL Analytics & Dynamic Graphing Engine
+// -------------------------------------------------------------
+let regressionTrendsChart = null;
+let runTimeseriesChart = null;
+
+async function checkDatabaseStatus() {
+  try {
+    const res = await fetch("/api/db/status");
+    const status = await res.json();
+    updateDbStatusUI(status);
+  } catch (err) {
+    updateDbStatusUI({ connected: false, error: err.message });
+  }
+}
+
+function updateDbStatusUI(status) {
+  const dot = document.getElementById("dbStatusDot");
+  const text = document.getElementById("dbStatusText");
+  const indicator = document.getElementById("dbStatusIndicator");
+  const targetLabel = document.getElementById("analyticsDbTarget");
+
+  if (status && status.connected) {
+    if (dot) dot.className = "status-dot status-dot-connected";
+    if (text) text.textContent = "🐘 DB: Connected";
+    if (indicator) {
+      indicator.title = `PostgreSQL Connected: ${status.database} on ${status.host}:${status.port}\nVersion: ${status.version || 'v17'}`;
+    }
+    if (targetLabel) targetLabel.textContent = `${status.database} (${status.host}:${status.port})`;
+  } else {
+    if (dot) dot.className = "status-dot status-dot-offline";
+    if (text) text.textContent = "🐘 DB: Offline";
+    if (indicator) {
+      indicator.title = `PostgreSQL Disconnected: ${status?.error || 'Connection failed'}. Running in local file fallback mode.`;
+    }
+    if (targetLabel) targetLabel.textContent = "Offline (Local fallback)";
+  }
+}
+
+function initAnalytics() {
+  const envFilter = document.getElementById("analyticsEnvFilter");
+  if (envFilter) {
+    envFilter.addEventListener("change", () => loadAnalytics());
+  }
+
+  const refreshBtn = document.getElementById("refreshAnalyticsBtn");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      showToast("Refreshing regression trends & analytics...", "info", "Analytics");
+      loadAnalytics();
+    });
+  }
+
+  const runSelect = document.getElementById("analyticsRunSelect");
+  if (runSelect) {
+    runSelect.addEventListener("change", (e) => {
+      if (e.target.value) {
+        loadRunInspector(e.target.value);
+      }
+    });
+  }
+}
+
+async function loadAnalytics() {
+  try {
+    const env = document.getElementById("analyticsEnvFilter")?.value || "all";
+    const [trendsRes, runsRes] = await Promise.all([
+      fetch(`/api/analytics/trends?env=${encodeURIComponent(env)}`),
+      fetch(`/api/runs?env=${encodeURIComponent(env)}&limit=50`)
+    ]);
+
+    const trends = await trendsRes.json();
+    const runsData = await runsRes.json();
+    const runs = runsData.runs || [];
+
+    // 1. Calculate KPIs
+    const totalRuns = runsData.total || runs.length || 0;
+    const kpiRunsEl = document.getElementById("kpiTotalRuns");
+    if (kpiRunsEl) kpiRunsEl.textContent = totalRuns;
+
+    const kpiRunsSub = document.getElementById("kpiRunsSubtext");
+    if (kpiRunsSub) {
+      kpiRunsSub.textContent = runsData.source === "postgresql" ? "PostgreSQL Relational DB" : "Local File Fallback";
+    }
+
+    if (runs.length > 0) {
+      const passedRuns = runs.filter(r => r.passed).length;
+      const successRate = ((passedRuns / runs.length) * 100).toFixed(1);
+      const kpiSuccess = document.getElementById("kpiSuccessRate");
+      if (kpiSuccess) {
+        kpiSuccess.textContent = `${successRate}%`;
+        kpiSuccess.className = `analytics-kpi-value ${Number(successRate) >= 90 ? "text-success" : "text-danger"}`;
+      }
+
+      const sumP95 = runs.reduce((s, r) => s + (Number(r.p95) || 0), 0);
+      const avgP95 = Math.round(sumP95 / runs.length);
+      const kpiMean = document.getElementById("kpiMeanP95");
+      if (kpiMean) kpiMean.textContent = `${avgP95} ms`;
+
+      const maxVus = runs.reduce((m, r) => Math.max(m, Number(r.peakVus) || 0), 0);
+      const kpiVus = document.getElementById("kpiPeakVus");
+      if (kpiVus) kpiVus.textContent = `${maxVus} VUs`;
+    } else {
+      const kpiSuccess = document.getElementById("kpiSuccessRate");
+      if (kpiSuccess) kpiSuccess.textContent = "—%";
+      const kpiMean = document.getElementById("kpiMeanP95");
+      if (kpiMean) kpiMean.textContent = "— ms";
+      const kpiVus = document.getElementById("kpiPeakVus");
+      if (kpiVus) kpiVus.textContent = "0 VUs";
+    }
+
+    // 2. Render Trends Line Chart
+    renderRegressionTrendsChart(Array.isArray(trends) ? trends : []);
+
+    // 3. Populate Run Selector for Timeseries Inspector
+    const select = document.getElementById("analyticsRunSelect");
+    if (select) {
+      const previousValue = select.value;
+      select.innerHTML = "";
+      if (runs.length === 0) {
+        select.innerHTML = `<option value="">No test runs available</option>`;
+      } else {
+        runs.forEach(r => {
+          const opt = document.createElement("option");
+          opt.value = r.id;
+          const d = new Date(r.date);
+          const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          opt.textContent = `#${r.runNumber || '-'} [${r.buildLabel || 'build'}] (${r.environment || 'staging'}) - p95: ${Math.round(r.p95)}ms @ ${time}`;
+          select.appendChild(opt);
+        });
+
+        // Retain or select first
+        if (previousValue && runs.some(r => r.id === previousValue)) {
+          select.value = previousValue;
+          loadRunInspector(previousValue);
+        } else {
+          select.value = runs[0].id;
+          loadRunInspector(runs[0].id);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("loadAnalytics error:", err);
+  }
+}
+
+function renderRegressionTrendsChart(trends) {
+  const canvas = document.getElementById("regressionTrendsChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  if (regressionTrendsChart) {
+    regressionTrendsChart.destroy();
+    regressionTrendsChart = null;
+  }
+
+  const isDark = document.documentElement.classList.contains("dark");
+  const textColor = isDark ? "#E4E4E7" : "#0F172A";
+  const gridColor = isDark ? "#2E2E34" : "#E2E8F0";
+
+  const labels = trends.map(t => `${t.build_label || 'build'} (#${t.run_number || '-'})`);
+  const p95Data = trends.map(t => Number(t.p95_latency_ms || 0));
+  const avgData = trends.map(t => Number(t.avg_latency_ms || 0));
+  const tpsData = trends.map(t => Number(t.throughput_rps || 0));
+
+  regressionTrendsChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "p95 Latency (ms)",
+          data: p95Data,
+          borderColor: "#C25E1A",
+          backgroundColor: "rgba(194, 94, 26, 0.12)",
+          borderWidth: 2,
+          pointBackgroundColor: "#C25E1A",
+          pointRadius: 4,
+          tension: 0.2,
+          yAxisID: "yLatency"
+        },
+        {
+          label: "Avg Latency (ms)",
+          data: avgData,
+          borderColor: "#D97706",
+          borderWidth: 1.5,
+          borderDash: [4, 4],
+          pointRadius: 3,
+          tension: 0.2,
+          yAxisID: "yLatency"
+        },
+        {
+          label: "Throughput (req/s)",
+          data: tpsData,
+          borderColor: "#2563EB",
+          backgroundColor: "rgba(37, 99, 235, 0.08)",
+          borderWidth: 2,
+          pointBackgroundColor: "#2563EB",
+          pointRadius: 4,
+          tension: 0.2,
+          yAxisID: "yThroughput"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: { color: textColor, font: { family: "JetBrains Mono", size: 11 } }
+        },
+        tooltip: {
+          padding: 10,
+          titleFont: { family: "JetBrains Mono" },
+          bodyFont: { family: "JetBrains Mono" }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { family: "JetBrains Mono", size: 10 } }
+        },
+        yLatency: {
+          type: "linear",
+          position: "left",
+          title: { display: true, text: "Latency (ms)", color: textColor, font: { size: 11 } },
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { family: "JetBrains Mono", size: 10 } },
+          min: 0
+        },
+        yThroughput: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "Throughput (req/s)", color: textColor, font: { size: 11 } },
+          grid: { drawOnChartArea: false },
+          ticks: { color: textColor, font: { family: "JetBrains Mono", size: 10 } },
+          min: 0
+        }
+      }
+    }
+  });
+}
+
+async function loadRunInspector(runId) {
+  try {
+    const [runRes, tsRes] = await Promise.all([
+      fetch(`/api/runs/${runId}`),
+      fetch(`/api/runs/${runId}/timeseries`)
+    ]);
+
+    if (!runRes.ok) return;
+    const run = await runRes.json();
+    const timeseries = tsRes.ok ? await tsRes.json() : [];
+
+    // Populate Meta Strip
+    const b = document.getElementById("inspBuild");
+    if (b) b.textContent = run.build_label || "v1.0.0";
+    const e = document.getElementById("inspEnv");
+    if (e) e.textContent = run.environment || "staging";
+    const v = document.getElementById("inspVerdict");
+    if (v) {
+      v.textContent = run.sla_verdict || (run.passed ? "PASSED" : "FAILED");
+      v.className = run.passed ? "text-success" : "text-danger";
+    }
+    const d = document.getElementById("inspDuration");
+    if (d) d.textContent = `${run.duration_seconds || 0}s`;
+    const tp = document.getElementById("inspThroughput");
+    if (tp) tp.textContent = `${Number(run.throughput_rps || 0).toFixed(1)} req/s`;
+    const tr = document.getElementById("inspTotalReqs");
+    if (tr) tr.textContent = Number(run.total_requests || 0).toLocaleString();
+    const er = document.getElementById("inspErrorRate");
+    if (er) er.textContent = `${Number(run.error_rate || 0).toFixed(2)}%`;
+
+    // Render Timeseries Chart
+    renderTimeseriesChart(timeseries);
+
+    // Render Endpoints Table
+    const tbody = document.getElementById("analyticsEndpointsTableBody");
+    if (tbody) {
+      tbody.innerHTML = "";
+      const endpoints = run.endpoints || [];
+
+      if (endpoints.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">No endpoint metrics recorded for this run.</td></tr>`;
+        return;
+      }
+
+      endpoints.forEach(ep => {
+        const row = document.createElement("tr");
+        const passed = !ep.threshold_breached;
+        row.innerHTML = `
+          <td><span class="method-badge method-${(ep.method || 'GET').toLowerCase()}">${ep.method || 'GET'}</span></td>
+          <td><strong>${escapeHtml(ep.route || ep.op_id)}</strong></td>
+          <td>${Math.round(ep.avg_ms)} ms</td>
+          <td>${Math.round(ep.p90_ms)} ms</td>
+          <td style="font-weight: 700; color: ${ep.p95_ms > 500 ? 'var(--danger)' : 'inherit'};">${Math.round(ep.p95_ms)} ms</td>
+          <td>${Math.round(ep.p99_ms)} ms</td>
+          <td>${Math.round(ep.max_ms)} ms</td>
+          <td>
+            <span class="badge ${passed ? 'badge-success' : 'badge-danger'}">
+              ${passed ? 'PASSED' : 'BREACHED'}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+  } catch (err) {
+    console.error("loadRunInspector error:", err);
+  }
+}
+
+function renderTimeseriesChart(timeseries) {
+  const canvas = document.getElementById("runTimeseriesChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  if (runTimeseriesChart) {
+    runTimeseriesChart.destroy();
+    runTimeseriesChart = null;
+  }
+
+  const isDark = document.documentElement.classList.contains("dark");
+  const textColor = isDark ? "#E4E4E7" : "#0F172A";
+  const gridColor = isDark ? "#2E2E34" : "#E2E8F0";
+
+  const labels = timeseries.map(pt => `${pt.second_offset}s`);
+  const vuData = timeseries.map(pt => Number(pt.active_vus || 0));
+  const tpsData = timeseries.map(pt => Number(pt.throughput_rps || 0));
+  const p95Data = timeseries.map(pt => Number(pt.p95_latency_ms || 0));
+
+  runTimeseriesChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Active VUs (Concurrency)",
+          data: vuData,
+          borderColor: "#8B5CF6",
+          backgroundColor: "rgba(139, 92, 246, 0.12)",
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          yAxisID: "yVus"
+        },
+        {
+          label: "Throughput (req/s)",
+          data: tpsData,
+          borderColor: "#2563EB",
+          borderWidth: 2,
+          tension: 0.2,
+          yAxisID: "yTps"
+        },
+        {
+          label: "p95 Latency (ms)",
+          data: p95Data,
+          borderColor: "#C25E1A",
+          borderWidth: 2,
+          tension: 0.2,
+          yAxisID: "yLatency"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          position: "top",
+          labels: { color: textColor, font: { family: "JetBrains Mono", size: 11 } }
+        },
+        tooltip: {
+          padding: 10,
+          titleFont: { family: "JetBrains Mono" },
+          bodyFont: { family: "JetBrains Mono" }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { family: "JetBrains Mono", size: 10 } }
+        },
+        yVus: {
+          type: "linear",
+          position: "left",
+          title: { display: true, text: "Active VUs", color: textColor, font: { size: 10 } },
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { family: "JetBrains Mono", size: 10 } },
+          min: 0
+        },
+        yTps: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "RPS", color: textColor, font: { size: 10 } },
+          grid: { drawOnChartArea: false },
+          ticks: { color: textColor, font: { family: "JetBrains Mono", size: 10 } },
+          min: 0
+        },
+        yLatency: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "p95 (ms)", color: textColor, font: { size: 10 } },
+          grid: { drawOnChartArea: false },
+          ticks: { color: textColor, font: { family: "JetBrains Mono", size: 10 } },
+          min: 0
+        }
+      }
+    }
+  });
+}
+
+function inspectRun(runId) {
+  switchTab("analytics");
+  const select = document.getElementById("analyticsRunSelect");
+  if (select) {
+    select.value = runId;
+  }
+  loadRunInspector(runId);
 }
 
 // -------------------------------------------------------------

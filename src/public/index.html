@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -34,7 +35,13 @@
           ☀️
         </button>
 
-        <!-- Live System Status -->
+        <!-- PostgreSQL Database Storage Status -->
+        <div class="status-indicator" id="dbStatusIndicator" title="PostgreSQL Storage Connection">
+          <span class="status-dot status-dot-offline" id="dbStatusDot"></span>
+          <span id="dbStatusText">🐘 DB: Checking...</span>
+        </div>
+
+        <!-- Live System WebSocket Status -->
         <div class="status-indicator">
           <span class="status-dot" id="wsStatusDot"></span>
           <span id="wsStatusText">Connecting...</span>
@@ -76,6 +83,9 @@
         </button>
         <button class="tab-btn" data-tab="history">
           📜 Run History
+        </button>
+        <button class="tab-btn" data-tab="analytics">
+          📈 Analytics & Trends
         </button>
       </div>
     </nav>
@@ -608,11 +618,13 @@
               <th>p95 Latency</th>
               <th>p99 Latency</th>
               <th>Error Rate</th>
+              <th>Storage</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody id="historyTableBody">
             <tr>
-              <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">
+              <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 30px;">
                 No runs recorded yet. Execute a load test to generate history.
               </td>
             </tr>
@@ -621,6 +633,124 @@
       </div>
     </section>
 
+    <!-- ====================================================================
+         TAB 7: ANALYTICS & TRENDS (PostgreSQL-Driven Dynamic Graphs)
+         ==================================================================== -->
+    <section id="tab-analytics" class="tab-content">
+      <div class="analytics-header-bar">
+        <div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--text);">Fleet Performance & Regression Analytics</div>
+          <div style="font-size: 12px; color: var(--text-muted);">
+            Real-time analytics constructed dynamically from PostgreSQL (<span class="text-mono" id="analyticsDbTarget">k6_performance_db</span>)
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="analyticsEnvFilter" class="input-select" style="padding: 6px 12px; font-size: 12px; width: 150px;">
+            <option value="all">All Environments</option>
+            <option value="staging">Staging</option>
+            <option value="production">Production</option>
+            <option value="sandbox-mock">Sandbox Mock</option>
+          </select>
+          <button id="refreshAnalyticsBtn" class="btn btn-secondary btn-sm" type="button">↻ Refresh Analytics</button>
+        </div>
+      </div>
+
+      <!-- KPI Fleet Metrics Grid -->
+      <div class="analytics-kpi-grid">
+        <div class="analytics-kpi-card">
+          <div class="analytics-kpi-label">Stored Test Runs</div>
+          <div class="analytics-kpi-value" id="kpiTotalRuns">0</div>
+          <div class="analytics-kpi-subtext" id="kpiRunsSubtext">PostgreSQL Relational DB</div>
+        </div>
+        <div class="analytics-kpi-card">
+          <div class="analytics-kpi-label">Fleet Success Rate</div>
+          <div class="analytics-kpi-value text-success" id="kpiSuccessRate">—%</div>
+          <div class="analytics-kpi-subtext">SLA compliance rate</div>
+        </div>
+        <div class="analytics-kpi-card">
+          <div class="analytics-kpi-label">Fleet Mean p95 Latency</div>
+          <div class="analytics-kpi-value" id="kpiMeanP95">— ms</div>
+          <div class="analytics-kpi-subtext">Across recorded builds</div>
+        </div>
+        <div class="analytics-kpi-card">
+          <div class="analytics-kpi-label">Peak Concurrent VUs</div>
+          <div class="analytics-kpi-value text-primary" id="kpiPeakVus">0 VUs</div>
+          <div class="analytics-kpi-subtext">Maximum stress benchmarked</div>
+        </div>
+      </div>
+
+      <!-- Historical Regression Trend Chart -->
+      <div class="chart-panel">
+        <div class="chart-panel-header">
+          <div>
+            <div class="chart-panel-title">Build-by-Build Latency & Throughput Trends</div>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Tracking latency regressions (p95 / avg) and throughput (req/s) across release versions
+            </div>
+          </div>
+          <span class="badge badge-primary">🐘 PostgreSQL Live</span>
+        </div>
+        <div class="chart-canvas-wrapper">
+          <canvas id="regressionTrendsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Interactive Single Run Timeseries Inspector -->
+      <div class="run-inspector-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+          <div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--text);">Dynamic Run Timeseries Inspector</div>
+            <div style="font-size: 11px; color: var(--text-muted);">
+              Second-by-second execution profile rendered dynamically from PostgreSQL <span class="text-mono">run_timeseries</span> table
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Select Run:</label>
+            <select id="analyticsRunSelect" class="input-select" style="font-family: var(--font-mono); font-size: 12px; padding: 6px 10px; min-width: 280px;"></select>
+          </div>
+        </div>
+
+        <!-- Selected Run Meta Strip -->
+        <div id="inspectorMetaStrip" style="display: flex; flex-wrap: wrap; gap: 16px; padding: 10px 14px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; font-family: var(--font-mono); font-size: 12px;">
+          <div><strong>Build:</strong> <span id="inspBuild">—</span></div>
+          <div><strong>Env:</strong> <span id="inspEnv">—</span></div>
+          <div><strong>Verdict:</strong> <span id="inspVerdict">—</span></div>
+          <div><strong>Duration:</strong> <span id="inspDuration">—</span></div>
+          <div><strong>Throughput:</strong> <span id="inspThroughput">—</span></div>
+          <div><strong>Total Reqs:</strong> <span id="inspTotalReqs">—</span></div>
+          <div><strong>Error Rate:</strong> <span id="inspErrorRate">—</span></div>
+        </div>
+
+        <!-- Timeseries Curve Chart -->
+        <div class="chart-canvas-wrapper" style="height: 280px; margin-bottom: 18px;">
+          <canvas id="runTimeseriesChart"></canvas>
+        </div>
+
+        <!-- Endpoint Breakdown for This Run -->
+        <div style="margin-top: 14px;">
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text);">
+            Endpoint Performance Breakdown (from <span class="text-mono">endpoint_run_metrics</span>)
+          </div>
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Route / Operation</th>
+                <th>Avg Latency</th>
+                <th>p90</th>
+                <th>p95</th>
+                <th>p99</th>
+                <th>Max</th>
+                <th>Threshold</th>
+              </tr>
+            </thead>
+            <tbody id="analyticsEndpointsTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 16px;">Select a run above to view breakdown.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- ====================================================================
