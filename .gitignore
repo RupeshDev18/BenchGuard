@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Generated Test Reports & Artifacts
+report-output/
+allure-results/
+.playwright-mcp/
+
+# Temporary / Uploaded Specs & Datasets
+uploaded-openapi.json
+fetched-openapi.json
+raw-openapi.json
+test-other-spec.json
+stest-openapi.json
+data/test-dataset.*
+
+# Logs & Temporary Media
+*.log
+*.png
+*.webp
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

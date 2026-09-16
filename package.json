@@ -1,0 +1,19 @@
+{
+  "name": "k6-performance-testing-allure",
+  "version": "1.0.0",
+  "description": "OpenAPI-driven k6 load testing, Schemathesis contract checks, Allure reporting and Management UI Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test:pipeline": "node run-pipeline.js --config config.json",
+    "mock:api": "node src/mock-server/mock-api.js",
+    "allure:open": "npx allure-commandline open report-output/allure-report"
+  },
+  "dependencies": {
+    "allure-commandline": "^2.32.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "ws": "^8.18.0"
+  }
+}

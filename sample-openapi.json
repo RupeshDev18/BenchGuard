@@ -1,0 +1,262 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Spring Boot E-Commerce Core Service API",
+    "description": "High-throughput REST API for customer management, product catalog, and order processing.",
+    "version": "1.4.2",
+    "contact": {
+      "name": "Engineering Platform Team",
+      "email": "devops@example.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Development / Staging Service"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health and Readiness Probe",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is healthy and ready to serve traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "UP" },
+                    "timestamp": { "type": "string", "example": "2026-09-16T12:00:00Z" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "List active products with pagination",
+        "operationId": "getProducts",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": { "type": "string", "example": "electronics" },
+            "required": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "example": 20 },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Products returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ProductResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Products"],
+        "summary": "Create a new catalog product",
+        "operationId": "createProduct",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateProductRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Product created successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProductResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{id}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Retrieve product details by ID",
+        "operationId": "getProductById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "example": 101 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProductResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Query recent customer orders",
+        "operationId": "getOrders",
+        "responses": {
+          "200": {
+            "description": "Orders retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/OrderResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Place a new customer order",
+        "operationId": "placeOrder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateOrderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order successfully placed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{orderId}/status": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get order fulfillment status",
+        "operationId": "getOrderStatus",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "example": "ORD-99824" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": { "type": "string", "example": "ORD-99824" },
+                    "status": { "type": "string", "example": "CONFIRMED" },
+                    "trackingNumber": { "type": "string", "example": "TRK-2026-X9" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProductResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 101 },
+          "name": { "type": "string", "example": "Wireless Mechanical Keyboard" },
+          "category": { "type": "string", "example": "electronics" },
+          "price": { "type": "number", "example": 129.99 },
+          "inStock": { "type": "boolean", "example": true }
+        }
+      },
+      "CreateProductRequest": {
+        "type": "object",
+        "required": ["name", "price", "category"],
+        "properties": {
+          "name": { "type": "string", "example": "Ultra-light Gaming Mouse" },
+          "category": { "type": "string", "example": "electronics" },
+          "price": { "type": "number", "example": 79.50 },
+          "sku": { "type": "string", "example": "SKU-MOU-01" },
+          "stockQuantity": { "type": "integer", "example": 150 }
+        }
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "required": ["customerId", "items", "shippingAddress"],
+        "properties": {
+          "customerId": { "type": "string", "example": "CUST-4029" },
+          "currency": { "type": "string", "example": "USD" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": { "type": "integer", "example": 101 },
+                "quantity": { "type": "integer", "example": 2 },
+                "unitPrice": { "type": "number", "example": 129.99 }
+              }
+            }
+          },
+          "shippingAddress": {
+            "type": "object",
+            "properties": {
+              "street": { "type": "string", "example": "123 Innovation Way" },
+              "city": { "type": "string", "example": "San Francisco" },
+              "zipCode": { "type": "string", "example": "94105" }
+            }
+          }
+        }
+      },
+      "OrderResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "string", "example": "ORD-99824" },
+          "customerId": { "type": "string", "example": "CUST-4029" },
+          "totalAmount": { "type": "number", "example": 259.98 },
+          "status": { "type": "string", "example": "PENDING" },
+          "createdAt": { "type": "string", "example": "2026-09-16T12:05:00Z" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>k6 & Allure Performance Studio | OpenAPI Test Platform</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Floating Toast Notifications Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="header-brand">
+        <div class="brand-icon">k6</div>
+        <div>
+          <div class="brand-title">Performance & Load Testing Studio</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+            OpenAPI • k6 Engine • Schemathesis • Allure 2 Reports
+          </div>
+        </div>
+        <span class="brand-badge">Enterprise</span>
+      </div>
+
+      <div class="header-actions">
+        <!-- Theme Toggle Button (Light/Dark) -->
+        <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Light/Dark Theme">
+          ☀️
+        </button>
+
+        <!-- Live System Status -->
+        <div class="status-indicator">
+          <span class="status-dot" id="wsStatusDot"></span>
+          <span id="wsStatusText">Connecting...</span>
+        </div>
+
+        <!-- Pipeline Execution State -->
+        <div class="status-indicator">
+          <span class="status-dot" id="pipelineStatusDot"></span>
+          <span id="pipelineStatusText">IDLE</span>
+          <span id="pipelineTimer" class="hidden text-primary" style="font-weight: 700;">(00:00)</span>
+        </div>
+
+        <button id="headerQuickRunBtn" class="btn btn-primary btn-sm">
+          ⚡ Quick Run
+        </button>
+        <button id="headerAbortBtn" class="btn btn-danger btn-sm hidden">
+          ⛔ Abort Run
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="app-nav">
+      <div class="nav-container">
+        <button class="tab-btn active" data-tab="demo">
+          ⚡ Demo Sandbox
+        </button>
+        <button class="tab-btn" data-tab="studio">
+          🛠️ Real Test Studio
+        </button>
+        <button class="tab-btn" data-tab="console">
+          🖥️ Live Console
+        </button>
+        <button class="tab-btn" data-tab="managementReport">
+          📊 Executive Report
+        </button>
+        <button class="tab-btn" data-tab="allureReport">
+          🏆 Allure 2 Deep-Dive
+        </button>
+        <button class="tab-btn" data-tab="history">
+          📜 Run History
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ====================================================================
+         TAB 1: DEMO SANDBOX (Pre-Configured Instant Benchmark)
+         ==================================================================== -->
+    <section id="tab-demo" class="tab-content active">
+      <div class="demo-hero">
+        <div class="demo-hero-text">
+          <h2>Spring Boot Benchmark Sandbox</h2>
+          <p>
+            Experience the automated k6 and Allure 2 load testing pipeline in action.
+            This sandbox comes pre-configured with a mock Spring Boot API server, full e-commerce OpenAPI 3.0 specification,
+            parameterized user data, and automated contract compliance testing.
+          </p>
+        </div>
+        <div>
+          <button id="runDemoBenchmarkBtn" class="btn btn-primary btn-lg">
+            ⚡ Run Demo Benchmark (1-Click)
+          </button>
+        </div>
+      </div>
+
+      <div class="demo-grid">
+        <!-- Mock Spring Boot Server Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Spring Boot Mock API Server</div>
+            <span class="badge" id="demoMockBadge">Checking...</span>
+          </div>
+          <div class="card-body">
+            <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
+              A built-in mock microservice replicating Spring Boot 3.x REST controllers with JWT security, input validation, and realistic response delays.
+            </p>
+
+            <div class="mock-server-status">
+              <div>
+                <div style="font-weight: 600; color: var(--text); font-size: 13px;" id="demoMockStatusTitle">Mock Server Status</div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);" id="demoMockStatusUrl">http://localhost:8080</div>
+              </div>
+              <button id="demoToggleMockBtn" class="btn btn-secondary btn-sm">Start Mock Server</button>
+            </div>
+
+            <div style="margin-top: 14px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
+                Included Demo Endpoints
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div class="endpoint-row" style="padding: 6px 10px;">
+                  <span class="method-badge method-GET">GET</span>
+                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/actuator/health</span>
+                  <span class="badge badge-success">200 OK</span>
+                </div>
+                <div class="endpoint-row" style="padding: 6px 10px;">
+                  <span class="method-badge method-POST">POST</span>
+                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/api/auth/login</span>
+                  <span class="badge badge-primary">JWT Token</span>
+                </div>
+                <div class="endpoint-row" style="padding: 6px 10px;">
+                  <span class="method-badge method-GET">GET</span>
+                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/api/products</span>
+                  <span class="badge">Catalog</span>
+                </div>
+                <div class="endpoint-row" style="padding: 6px 10px;">
+                  <span class="method-badge method-POST">POST</span>
+                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/api/orders</span>
+                  <span class="badge badge-warning">201 Created</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pre-Configured Benchmark Specs Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Demo Test Profile & SLA Policy</div>
+            <span class="badge badge-primary">Pre-Configured</span>
+          </div>
+          <div class="card-body">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div class="spec-info-row">
+                <span class="label">Specification:</span>
+                <span class="value">sample-openapi.json (OpenAPI 3.0.3)</span>
+              </div>
+              <div class="spec-info-row">
+                <span class="label">Target Service:</span>
+                <span class="value">http://localhost:8080 (Spring Boot)</span>
+              </div>
+              <div class="spec-info-row">
+                <span class="label">Load Stages:</span>
+                <span class="value">10 VUs Ramp (10 seconds)</span>
+              </div>
+              <div class="spec-info-row">
+                <span class="label">Contract Validation:</span>
+                <span class="value">Enabled (Schemathesis Strict Check)</span>
+              </div>
+              <div class="spec-info-row">
+                <span class="label">p95 Latency SLA:</span>
+                <span class="value">&lt; 500 ms</span>
+              </div>
+              <div class="spec-info-row">
+                <span class="label">Error Tolerance:</span>
+                <span class="value">&lt; 1.0% failure rate</span>
+              </div>
+              <div class="spec-info-row">
+                <span class="label">Dataset:</span>
+                <span class="value">data/sample-users.csv (25 Parameterized Records)</span>
+              </div>
+            </div>
+
+            <div style="margin-top: 18px; padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
+              <div style="font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px;">Need custom testing?</div>
+              <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
+                Switch to the <strong>Real Test Studio</strong> tab to upload your own OpenAPI/Swagger JSON, configure custom payloads with dynamic variables, adjust VUs, and test external APIs.
+              </p>
+              <button id="goToRealStudioBtn" class="btn btn-secondary btn-sm">Go to Real Test Studio →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         TAB 2: REAL TEST STUDIO (100% Fully Customizable)
+         ==================================================================== -->
+    <section id="tab-studio" class="tab-content">
+      <div class="studio-grid">
+
+        <!-- Column Left: Spec Ingestion, Target & Endpoints -->
+        <div class="studio-col">
+
+          <!-- Card 1: OpenAPI / Swagger Specification Source & Diagnostics -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                1. OpenAPI / Swagger Specification
+              </div>
+              <span class="badge" id="specStatusBadge">Checking</span>
+            </div>
+            <div class="card-body">
+              <div class="input-group">
+                <label>Ingestion Method</label>
+                <div class="pill-selector">
+                  <button type="button" class="pill-option active" data-spec-mode="upload">Upload JSON File</button>
+                  <button type="button" class="pill-option" data-spec-mode="url">Fetch Live URL</button>
+                  <button type="button" class="pill-option" data-spec-mode="raw">Paste Raw JSON</button>
+                  <button type="button" class="pill-option" data-spec-mode="sample">Sample Spec</button>
+                </div>
+              </div>
+
+              <!-- Upload File Dropzone -->
+              <div id="specUploadContainer" class="spec-input-container">
+                <div class="dropzone" id="specDropzone">
+                  <div class="dropzone-icon">
+                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  </div>
+                  <div class="dropzone-title">Click to select or drag & drop OpenAPI/Swagger JSON file</div>
+                  <div class="dropzone-hint">Supports OpenAPI 3.0, 3.1 & Swagger 2.0 (.json)</div>
+                  <input type="file" id="specFileInput" accept=".json" style="display: none;" />
+                </div>
+                <div id="specSelectedFileBox" class="hidden dropzone-selected-file">
+                  <div>
+                    <span style="font-weight: 700; font-family: var(--font-mono);" id="specSelectedFileName">spec.json</span>
+                    <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;" id="specSelectedFileSize">0 KB</span>
+                  </div>
+                  <button id="uploadSelectedSpecBtn" class="btn btn-primary btn-sm" type="button">Upload & Parse Spec</button>
+                </div>
+              </div>
+
+              <!-- Live URL Input -->
+              <div id="specUrlContainer" class="hidden spec-input-container">
+                <div class="input-group">
+                  <label for="springBootUrl">Live Docs URL</label>
+                  <div class="flex-row">
+                    <input type="text" id="springBootUrl" placeholder="http://localhost:8080/v3/api-docs" value="http://localhost:8080/v3/api-docs" />
+                    <button id="fetchUrlBtn" class="btn btn-secondary" type="button">Fetch & Validate</button>
+                  </div>
+                  <span class="input-hint">Supports Springdoc /v3/api-docs, Swagger /v2/api-docs, FastAPI /openapi.json</span>
+                </div>
+              </div>
+
+              <!-- Raw JSON Textarea Input -->
+              <div id="specRawContainer" class="hidden spec-input-container">
+                <div class="input-group">
+                  <label for="specRawTextarea">Paste JSON Content</label>
+                  <textarea id="specRawTextarea" rows="6" placeholder="Paste { 'openapi': '3.0.0', 'paths': { ... } } here..."></textarea>
+                  <div style="margin-top: 6px; display: flex; justify-content: flex-end;">
+                    <button id="parseRawJsonBtn" class="btn btn-secondary btn-sm" type="button">Parse & Validate JSON</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Diagnostic Validation Panel -->
+              <div class="spec-diagnostics-card" id="diagnosticsPanel">
+                <div class="diagnostics-header">
+                  <div class="diagnostics-meta">
+                    <span class="badge" id="diagVerdictBadge">VALID SPECIFICATION</span>
+                    <span class="badge badge-primary" id="diagFormatBadge">OpenAPI 3.0.3</span>
+                    <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);" id="diagEndpointCount">7 endpoints</span>
+                  </div>
+                  <button id="reloadSpecBtn" class="btn btn-dark btn-sm" type="button" title="Reload from source">↻ Refresh</button>
+                </div>
+                <div class="diagnostics-body">
+                  <!-- Info rows -->
+                  <div class="spec-info-row">
+                    <span class="label">API Title:</span>
+                    <span class="value" id="specInfoTitle">Spring Boot Core API</span>
+                  </div>
+                  <div class="spec-info-row">
+                    <span class="label">Version:</span>
+                    <span class="value" id="specInfoVersion">1.0.0</span>
+                  </div>
+
+                  <!-- Methods summary tags -->
+                  <div class="diagnostics-methods-row" id="diagMethodsContainer">
+                    <!-- e.g. GET: 4, POST: 2 -->
+                  </div>
+
+                  <!-- Errors list (if any) -->
+                  <div id="diagErrorsContainer" class="hidden"></div>
+
+                  <!-- Warnings list (if any) -->
+                  <div id="diagWarningsContainer" class="hidden"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Card 2: Target Service & Authentication -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                2. Target Service & Security
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="input-group">
+                <label for="baseUrlInput">Base URL Under Test</label>
+                <input type="text" id="baseUrlInput" placeholder="http://localhost:8080" />
+                <span class="input-hint">Prefix prepended to all discovered routes</span>
+              </div>
+
+              <div class="input-group">
+                <label for="authTokenInput">Bearer / JWT Authorization Token (Optional)</label>
+                <input type="password" id="authTokenInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+                <span class="input-hint">Sent as <code>Authorization: Bearer &lt;token&gt;</code> on every request</span>
+              </div>
+
+              <div class="flex-row" style="margin-bottom: 12px;">
+                <div class="input-group" style="flex: 1; margin-bottom: 0;">
+                  <label for="buildLabelInput">Build / Release Tag</label>
+                  <input type="text" id="buildLabelInput" placeholder="release-2.4.0" />
+                </div>
+                <div class="input-group" style="flex: 1; margin-bottom: 0;">
+                  <label for="environmentInput">Environment</label>
+                  <input type="text" id="environmentInput" placeholder="staging / perf-lab" />
+                </div>
+              </div>
+
+              <div class="input-group">
+                <label for="customHeadersInput">Custom Headers (JSON Object)</label>
+                <textarea id="customHeadersInput" rows="2" placeholder='{ "X-Tenant-ID": "tenant-01", "X-Client": "k6-studio" }'></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Parameterized Dataset Feeder (CSV / JSON) -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                3. Parameterized Test Dataset (CSV / JSON)
+              </div>
+              <span class="badge" id="datasetBadge">None Loaded</span>
+            </div>
+            <div class="card-body">
+              <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
+                Inject unique user credentials, product IDs, or customer records into requests using <code>{{dataset.columnName}}</code> tags.
+              </p>
+
+              <div class="flex-row" style="margin-bottom: 12px;">
+                <input type="file" id="datasetFileInput" accept=".csv,.json" style="flex: 1;" />
+                <button id="uploadDatasetBtn" class="btn btn-secondary" type="button">Upload Dataset</button>
+              </div>
+
+              <div id="datasetInfoBox" class="hidden" style="background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px;">
+                <div class="spec-info-row">
+                  <span class="label">File:</span>
+                  <span class="value" id="datasetFileName">data.csv</span>
+                </div>
+                <div class="spec-info-row">
+                  <span class="label">Records:</span>
+                  <span class="value" id="datasetTotalRows">0 records</span>
+                </div>
+                <div class="spec-info-row">
+                  <span class="label">Available Columns:</span>
+                  <span class="value text-primary" id="datasetColumnsList">none</span>
+                </div>
+                <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                  <button id="removeDatasetBtn" class="btn btn-danger btn-sm" type="button">Remove Dataset</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Column Right: Endpoints Configurator, Stages & SLAs -->
+        <div class="studio-col">
+
+          <!-- Card 4: Endpoints & Payload Scenarios -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                4. Endpoints & Payload Scenarios
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button id="selectAllEndpoints" class="btn btn-dark btn-sm" type="button">Select All</button>
+                <button id="clearEndpoints" class="btn btn-dark btn-sm" type="button">Clear All</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="endpoints-toolbar">
+                <input type="text" id="endpointSearchInput" placeholder="Filter by path, method, or tag..." style="padding: 6px 10px;" />
+              </div>
+
+              <div class="endpoints-list" id="endpointListContainer">
+                <div style="color: var(--text-muted); font-size: 12px; text-align: center; padding: 24px;">
+                  Parsing OpenAPI routes...
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 5: Concurrency Profile & Stages -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                5. Concurrency Profile & Load Curve
+              </div>
+              <div class="pill-selector">
+                <button type="button" class="pill-option active" data-load-mode="stages">Ramp Stages</button>
+                <button type="button" class="pill-option" data-load-mode="flat">Flat Concurrency</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <!-- Stages Mode -->
+              <div id="stagesModeContainer">
+                <table class="stages-table">
+                  <thead>
+                    <tr>
+                      <th>Stage Duration</th>
+                      <th>Target VUs</th>
+                      <th style="width: 40px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="stagesTableBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+                <button id="addStageBtn" class="btn btn-dark btn-sm" type="button">+ Add Stage Ramp</button>
+              </div>
+
+              <!-- Flat Mode -->
+              <div id="flatModeContainer" class="hidden">
+                <div class="flex-row">
+                  <div class="input-group" style="flex: 1;">
+                    <label for="flatVus">Constant VUs</label>
+                    <input type="number" id="flatVus" value="20" min="1" max="5000" />
+                  </div>
+                  <div class="input-group" style="flex: 1;">
+                    <label for="flatDuration">Duration</label>
+                    <input type="text" id="flatDuration" value="30s" placeholder="30s, 2m, 5m" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Flat Canvas Visualizer -->
+              <div class="canvas-container">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">
+                  Load Profile Projection
+                </div>
+                <canvas id="loadCurveCanvas" height="70"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 6: Performance SLAs & Contract Testing -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                6. SLA Thresholds & Contract Validation
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="flex-row" style="margin-bottom: 12px;">
+                <div class="input-group" style="flex: 1; margin-bottom: 0;">
+                  <label for="p95Threshold">p95 Latency SLA (ms)</label>
+                  <input type="number" id="p95Threshold" value="500" />
+                </div>
+                <div class="input-group" style="flex: 1; margin-bottom: 0;">
+                  <label for="p99Threshold">p99 Latency SLA (ms)</label>
+                  <input type="number" id="p99Threshold" value="1000" />
+                </div>
+                <div class="input-group" style="flex: 1; margin-bottom: 0;">
+                  <label for="maxErrorRate">Max Error Rate (%)</label>
+                  <input type="number" id="maxErrorRate" value="1.0" step="0.1" />
+                </div>
+              </div>
+
+              <div style="padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius); display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-weight: 600; color: var(--text); font-size: 12px;">Schemathesis Contract Testing</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">Validates HTTP response status codes and schemas strictly against OpenAPI definitions</div>
+                </div>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="checkbox" id="contractEnabledCheckbox" checked style="accent-color: var(--primary); width: 16px; height: 16px;" />
+                  <span style="font-size: 12px; font-weight: 600;">Enable</span>
+                </label>
+              </div>
+
+              <!-- Action Footer -->
+              <div style="margin-top: 16px; display: flex; gap: 12px;">
+                <button id="launchTestBtn" class="btn btn-primary btn-lg" style="flex: 2;" type="button">
+                  🚀 Launch Load Test Pipeline
+                </button>
+                <button id="saveConfigBtn" class="btn btn-secondary btn-lg" style="flex: 1;" type="button">
+                  💾 Save Config
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         TAB 3: LIVE STREAMING CONSOLE
+         ==================================================================== -->
+    <section id="tab-console" class="tab-content">
+      <div class="terminal-card">
+        <div class="terminal-header">
+          <div class="terminal-title">
+            <span class="status-dot running"></span>
+            <span>PIPELINE EXECUTION LOGS • k6 & SCHEMATHESIS RUNNER</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button id="clearLogsBtn" class="btn btn-dark btn-sm" type="button">Clear</button>
+            <button id="copyLogsBtn" class="btn btn-dark btn-sm" type="button">Copy Logs</button>
+            <button id="abortTestBtn" class="btn btn-danger btn-sm hidden" type="button">Abort Execution</button>
+          </div>
+        </div>
+        <div class="terminal-output" id="terminalOutput">
+          <div class="log-line text-muted">[system] Console initialized. Ready to stream test execution logs...</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         TAB 4: EXECUTIVE MANAGEMENT REPORT
+         ==================================================================== -->
+    <section id="tab-managementReport" class="tab-content">
+      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 700; color: var(--text);">Executive SLA Compliance Report</div>
+        <div style="display: flex; gap: 8px;">
+          <button id="refreshReportBtn" class="btn btn-secondary btn-sm" type="button">↻ Reload Report</button>
+          <a href="/reports/report.html" target="_blank" class="btn btn-dark btn-sm">Open in New Tab ↗</a>
+        </div>
+      </div>
+      <div class="report-frame-container">
+        <iframe id="managementReportIframe" class="report-frame" src="/reports/report.html"></iframe>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         TAB 5: ALLURE 2 DEEP-DIVE
+         ==================================================================== -->
+    <section id="tab-allureReport" class="tab-content">
+      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 700; color: var(--text);">Allure 2 Test Execution Report</div>
+        <div style="display: flex; gap: 8px;">
+          <button id="refreshAllureBtn" class="btn btn-secondary btn-sm" type="button">↻ Reload Allure</button>
+          <a href="/reports/allure-report/index.html" target="_blank" class="btn btn-dark btn-sm">Open in New Tab ↗</a>
+        </div>
+      </div>
+      <div class="report-frame-container">
+        <iframe id="allureReportIframe" class="report-frame" src="/reports/allure-report/index.html"></iframe>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         TAB 6: RUN HISTORY
+         ==================================================================== -->
+    <section id="tab-history" class="tab-content">
+      <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 14px; font-weight: 700; color: var(--text);">Benchmark Run History (Last 30 Runs)</div>
+        <button id="refreshHistoryBtn" class="btn btn-secondary btn-sm" type="button">↻ Refresh History</button>
+      </div>
+
+      <div class="card">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Build</th>
+              <th>Env</th>
+              <th>Verdict</th>
+              <th>Peak VUs</th>
+              <th>Throughput</th>
+              <th>p95 Latency</th>
+              <th>p99 Latency</th>
+              <th>Error Rate</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr>
+              <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                No runs recorded yet. Execute a load test to generate history.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ====================================================================
+       ENDPOINT SCENARIO & PAYLOAD MODAL
+       ==================================================================== -->
+  <div class="modal-overlay hidden" id="endpointModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modalEndpointTitle">Configure Endpoint Scenario</div>
+        <button id="closeModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="method-badge" id="modalMethodBadge">POST</span>
+          <span style="font-family: var(--font-mono); font-weight: 600; color: var(--text);" id="modalRouteText">/api/orders</span>
+        </div>
+
+        <!-- Expected Status Codes -->
+        <div class="input-group">
+          <label>Expected HTTP Status Codes</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);" id="expectedStatusCheckboxes">
+            <label style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; cursor: pointer;">
+              <input type="checkbox" value="200" style="accent-color: var(--primary);" /> 200 OK
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; cursor: pointer;">
+              <input type="checkbox" value="201" style="accent-color: var(--primary);" /> 201 Created
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; cursor: pointer;">
+              <input type="checkbox" value="204" style="accent-color: var(--primary);" /> 204 No Content
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; cursor: pointer;">
+              <input type="checkbox" value="400" style="accent-color: var(--primary);" /> 400 Bad Request
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; cursor: pointer;">
+              <input type="checkbox" value="404" style="accent-color: var(--primary);" /> 404 Not Found
+            </label>
+          </div>
+          <span class="input-hint">Requests returning any of the checked codes will be marked as PASSED in k6 and Allure.</span>
+        </div>
+
+        <!-- Payload Editor -->
+        <div id="modalPayloadSection" class="input-group">
+          <label for="modalPayloadEditor">Request Body JSON</label>
+          <textarea id="modalPayloadEditor" rows="8" style="font-size: 12px; line-height: 1.5;"></textarea>
+
+          <div style="margin-top: 8px;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+              Dynamic Variables (Insert Token)
+            </div>
+            <div class="tag-buttons-container">
+              <button type="button" class="tag-btn" data-tag="{{$randomUUID}}">+ {{$randomUUID}}</button>
+              <button type="button" class="tag-btn" data-tag="{{$randomEmail}}">+ {{$randomEmail}}</button>
+              <button type="button" class="tag-btn" data-tag="{{$timestamp}}">+ {{$timestamp}}</button>
+              <button type="button" class="tag-btn" data-tag="{{$vu}}">+ {{$vu}} (Virtual User)</button>
+              <button type="button" class="tag-btn" data-tag="{{$iter}}">+ {{$iter}} (Iteration)</button>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px;" id="modalDatasetTagsSection">
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+              Dataset Columns (From Uploaded CSV/JSON)
+            </div>
+            <div class="tag-buttons-container" id="datasetColumnTags">
+              <span style="font-size: 11px; color: var(--text-dim); font-family: var(--font-mono);">No active dataset loaded</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button id="resetPayloadBtn" class="btn btn-dark" type="button">Reset to Schema Default</button>
+        <button id="savePayloadModalBtn" class="btn btn-primary" type="button">Apply to Endpoint</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

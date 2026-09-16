@@ -1,0 +1,49 @@
+{
+  "openapiPath": "sample-openapi.json",
+  "baseUrl": "http://localhost:8080",
+  "headers": {
+    "Authorization": "Bearer sample-jwt-token-xyz-123",
+    "X-Test-Source": "k6-enterprise-pipeline"
+  },
+  "load": {
+    "mode": "stages",
+    "stages": [
+      {
+        "duration": "3s",
+        "target": 50
+      },
+      {
+        "duration": "4s",
+        "target": 70
+      },
+      {
+        "duration": "3s",
+        "target": 0
+      }
+    ]
+  },
+  "thresholds": {
+    "p95Ms": 500,
+    "p99Ms": 1000,
+    "maxErrorRate": 0.02
+  },
+  "endpoints": {
+    "include": [
+      "all"
+    ],
+    "exclude": []
+  },
+  "contractTesting": {
+    "enabled": true,
+    "checks": [
+      "all_status_codes",
+      "all_schemas"
+    ]
+  },
+  "run": {
+    "buildLabel": "demo-benchmark-v1",
+    "environment": "sandbox-mock"
+  },
+  "endpointConfigs": {},
+  "datasetPath": "data/sample-users.csv"
+}
