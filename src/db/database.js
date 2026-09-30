@@ -1,6 +1,7 @@
 const { Pool, Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { hashPassword } = require('../auth/auth-utils');
 
 const DB_CONFIG = {
     user: process.env.PGUSER || 'postgres',
@@ -24,6 +25,79 @@ let dbStatus = {
     error: null,
     version: null
 };
+
+/**
+ * Seeds default Superadmin, Organization, Project, and Environment if not already present.
+ */
+async function seedMultiTenantDefaults() {
+    try {
+        const superCheck = await pool.query("SELECT id FROM users WHERE is_superadmin = true LIMIT 1");
+        let superId = superCheck.rows[0]?.id;
+
+        if (!superId) {
+            console.log('[Database] Seeding default Platform Superadmin...');
+            const pwHash = await hashPassword('Admin@12345');
+            const userRes = await pool.query(
+                `INSERT INTO users (email, password_hash, full_name, is_superadmin)
+                 VALUES ($1, $2, $3, true)
+                 RETURNING id`,
+                ['superadmin@platform.local', pwHash, 'Platform Superadmin']
+            );
+            superId = userRes.rows[0].id;
+        }
+
+        // Ensure default organization exists
+        const orgRes = await pool.query(
+            `INSERT INTO organizations (name, slug, plan_tier, max_vus_allowed, max_projects)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+             RETURNING id`,
+            ['Acme Corporation', 'acme-corp', 'enterprise', 500, 20]
+        );
+        const orgId = orgRes.rows[0].id;
+
+        // Ensure superadmin is member/admin of default org
+        await pool.query(
+            `INSERT INTO organization_members (org_id, user_id, role)
+             VALUES ($1, $2, 'admin')
+             ON CONFLICT (org_id, user_id) DO NOTHING`,
+            [orgId, superId]
+        );
+
+        // Ensure default project exists
+        const projRes = await pool.query(
+            `INSERT INTO projects (org_id, name, slug, description, created_by)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (org_id, slug) DO UPDATE SET name = EXCLUDED.name
+             RETURNING id`,
+            [orgId, 'E-Commerce Storefront', 'ecommerce-storefront', 'Primary E-Commerce REST service with JWT and catalog', superId]
+        );
+        const projId = projRes.rows[0].id;
+
+        // Ensure default environment exists
+        const envCheck = await pool.query("SELECT id FROM project_environments WHERE project_id = $1 LIMIT 1", [projId]);
+        let envId = envCheck.rows[0]?.id;
+        if (!envId) {
+            const envRes = await pool.query(
+                `INSERT INTO project_environments (project_id, name, base_url)
+                 VALUES ($1, $2, $3)
+                 RETURNING id`,
+                [projId, 'Staging (Local)', 'http://localhost:8080']
+            );
+            envId = envRes.rows[0].id;
+        }
+
+        // Backfill existing test_runs with default org and project
+        await pool.query(
+            `UPDATE test_runs SET org_id = $1, project_id = $2, environment_id = $3 WHERE project_id IS NULL`,
+            [orgId, projId, envId]
+        );
+
+        console.log(`[Database] Multi-tenant seed ready: Superadmin (superadmin@platform.local), Org (acme-corp), Project (ecommerce-storefront).`);
+    } catch (err) {
+        console.warn(`[Database] Error during multi-tenant seeding: ${err.message}`);
+    }
+}
 
 /**
  * Ensures the target database exists and applies the schema.
@@ -50,7 +124,6 @@ async function initDatabase() {
 
         if (checkDb.rowCount === 0) {
             console.log(`[Database] Database '${DB_CONFIG.database}' not found. Creating it now...`);
-            // datname cannot be parameterized in CREATE DATABASE
             const safeDbName = DB_CONFIG.database.replace(/[^a-zA-Z0-9_]/g, '');
             await adminClient.query(`CREATE DATABASE "${safeDbName}"`);
             console.log(`[Database] Database '${safeDbName}' created successfully.`);
@@ -83,6 +156,9 @@ async function initDatabase() {
             await pool.query(schemaSql);
             console.log(`[Database] Relational schema verified & tables migrated successfully.`);
         }
+
+        // 4. Seed multi-tenant foundation (Superadmin, Org, Project)
+        await seedMultiTenantDefaults();
 
         return true;
     } catch (err) {
@@ -123,6 +199,7 @@ function getDbStatus() {
 
 module.exports = {
     initDatabase,
+    seedMultiTenantDefaults,
     query,
     getClient,
     getDbStatus,

@@ -1,0 +1,70 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Minimal REST API Service",
+    "description": "Standard CRUD API for items and users management",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Development Server"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health status probe",
+        "operationId": "getHealth",
+        "responses": {
+          "200": { "description": "Service is healthy" }
+        }
+      }
+    },
+    "/api/items": {
+      "get": {
+        "summary": "List all items",
+        "operationId": "listItems",
+        "responses": {
+          "200": { "description": "List of items retrieved" }
+        }
+      },
+      "post": {
+        "summary": "Create an item",
+        "operationId": "createItem",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Item-{{$vu}}-{{$iter}}" },
+                  "price": { "type": "number", "example": 29.99 },
+                  "category": { "type": "string", "example": "Electronics" }
+                },
+                "required": ["name", "price"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Item created successfully" }
+        }
+      }
+    },
+    "/api/items/{id}": {
+      "get": {
+        "summary": "Get item by ID",
+        "operationId": "getItemById",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "example": 101 } }
+        ],
+        "responses": {
+          "200": { "description": "Item details" },
+          "404": { "description": "Item not found" }
+        }
+      }
+    }
+  }
+}

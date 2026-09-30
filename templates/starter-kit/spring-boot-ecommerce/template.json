@@ -1,0 +1,12 @@
+{
+  "id": "spring-boot-ecommerce",
+  "name": "Spring Boot E-Commerce API",
+  "category": "Microservices",
+  "description": "Production-style OpenAPI 3.0 spec featuring health probes, JWT authentication, paginated products catalog, and dynamic order placements.",
+  "specFile": "sample-openapi.json",
+  "datasetFile": "sample-users.csv",
+  "defaultBaseUrl": "http://localhost:8080",
+  "endpointsCount": 4,
+  "recommendedVus": 25,
+  "recommendedDuration": "15s"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "minimal-rest-api",
+  "name": "Minimal REST Service (CRUD)",
+  "category": "Basic CRUD",
+  "description": "Lightweight OpenAPI 3.0 specification with health check, list items, and dynamic item creation.",
+  "specFile": "openapi.json",
+  "defaultBaseUrl": "http://localhost:8080",
+  "endpointsCount": 3,
+  "recommendedVus": 10,
+  "recommendedDuration": "10s"
+}
