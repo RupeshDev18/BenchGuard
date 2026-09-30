@@ -34,6 +34,21 @@ async function saveRun(runData) {
         const maxLatencyMs = Number(runData.max_latency_ms !== undefined ? runData.max_latency_ms : (runData.maxLatencyMs || 0));
         const configSnapshot = runData.config_snapshot || runData.configSnapshot || {};
 
+        const orgId = runData.org_id || runData.orgId || null;
+        const projectId = runData.project_id || runData.projectId || null;
+        const environmentId = runData.environment_id || runData.environmentId || null;
+        const triggeredBy = runData.triggered_by || runData.triggeredBy || null;
+
+        let finalOrgId = orgId;
+        let finalProjectId = projectId;
+        if (!finalOrgId || !finalProjectId) {
+            const defaultProj = await client.query("SELECT id, org_id FROM projects WHERE slug = 'ecommerce-storefront' LIMIT 1");
+            if (defaultProj.rows.length > 0) {
+                if (!finalProjectId) finalProjectId = defaultProj.rows[0].id;
+                if (!finalOrgId) finalOrgId = defaultProj.rows[0].org_id;
+            }
+        }
+
         // 1. Insert into test_runs
         const insertRunQuery = `
             INSERT INTO test_runs (
@@ -43,10 +58,12 @@ async function saveRun(runData) {
                 passed, sla_verdict, peak_vus, total_requests,
                 failed_requests, error_rate, throughput_rps,
                 p95_latency_ms, p99_latency_ms, avg_latency_ms,
-                med_latency_ms, max_latency_ms, config_snapshot
+                med_latency_ms, max_latency_ms, config_snapshot,
+                org_id, project_id, environment_id, triggered_by
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+                $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
+                $25, $26, $27, $28
             )
             RETURNING *
         `;
@@ -58,7 +75,8 @@ async function saveRun(runData) {
             passed, slaVerdict, peakVus, totalRequests,
             failedRequests, errorRate, throughputRps,
             p95LatencyMs, p99LatencyMs, avgLatencyMs,
-            medLatencyMs, maxLatencyMs, JSON.stringify(configSnapshot)
+            medLatencyMs, maxLatencyMs, JSON.stringify(configSnapshot),
+            finalOrgId, finalProjectId, environmentId, triggeredBy
         ]);
 
         const savedRun = runResult.rows[0];

@@ -87,6 +87,24 @@ async function seedMultiTenantDefaults() {
             envId = envRes.rows[0].id;
         }
 
+        // Ensure default spec exists
+        const specCheck = await pool.query("SELECT id FROM project_specs WHERE project_id = $1 LIMIT 1", [projId]);
+        if (specCheck.rows.length === 0) {
+            const sampleSpecPath = path.resolve(__dirname, '../../sample-openapi.json');
+            if (fs.existsSync(sampleSpecPath)) {
+                try {
+                    const sampleSpec = JSON.parse(fs.readFileSync(sampleSpecPath, 'utf8'));
+                    await pool.query(
+                        `INSERT INTO project_specs (project_id, name, version, format, raw_content, endpoint_configs, is_active)
+                         VALUES ($1, $2, $3, $4, $5, $6, TRUE)`,
+                        [projId, 'E-Commerce Storefront API', '3.0.3', 'json', sampleSpec, {}]
+                    );
+                } catch (e) {
+                    console.warn(`[Database] Failed to seed initial OpenAPI spec: ${e.message}`);
+                }
+            }
+        }
+
         // Backfill existing test_runs with default org and project
         await pool.query(
             `UPDATE test_runs SET org_id = $1, project_id = $2, environment_id = $3 WHERE project_id IS NULL`,

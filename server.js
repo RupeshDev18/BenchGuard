@@ -21,10 +21,12 @@ const authRoutes = require("./src/routes/auth-routes");
 const adminRoutes = require("./src/routes/admin-routes");
 const orgRoutes = require("./src/routes/org-routes");
 const projectRoutes = require("./src/routes/project-routes");
+const broadcaster = require("./src/utils/broadcaster");
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+broadcaster.setWebSocketServer(wss);
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
@@ -56,17 +58,13 @@ const upload = multer({ storage });
 // State tracking
 let activeProcess = null;
 let pipelineRunning = false;
+let currentPipelineMeta = {};
 let mockServerProcess = null;
 let mockServerRunning = false;
 
 // Broadcast helper for WebSockets
 function broadcast(type, data) {
-  const msg = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
-    }
-  });
+  broadcaster.broadcast(type, data);
 }
 
 // -------------------------------------------------------------
@@ -642,8 +640,19 @@ app.post("/api/pipeline/start", (req, res) => {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(req.body, null, 2), "utf8");
   }
 
+  currentPipelineMeta = {
+    projectId: req.body?.projectId || req.headers["x-project-id"] || null,
+    orgId: req.body?.orgId || req.headers["x-org-id"] || null,
+    environmentId: req.body?.environmentId || null,
+    triggeredBy: req.user?.id || null
+  };
+
   pipelineRunning = true;
-  broadcast("pipeline_started", { startTime: new Date().toISOString() });
+  broadcast("pipeline_started", { 
+    startTime: new Date().toISOString(),
+    projectId: currentPipelineMeta.projectId,
+    orgId: currentPipelineMeta.orgId
+  });
 
   activeProcess = spawn("node", ["run-pipeline.js", "--config", "config.json"], {
     cwd: ROOT_DIR,
@@ -652,21 +661,26 @@ app.post("/api/pipeline/start", (req, res) => {
 
   activeProcess.stdout.on("data", (data) => {
     const text = data.toString();
-    broadcast("log", { text, stream: "stdout" });
+    broadcast("log", { text, stream: "stdout", projectId: currentPipelineMeta.projectId });
   });
 
   activeProcess.stderr.on("data", (data) => {
     const text = data.toString();
-    broadcast("log", { text, stream: "stderr" });
+    broadcast("log", { text, stream: "stderr", projectId: currentPipelineMeta.projectId });
   });
 
   activeProcess.on("close", (code) => {
     pipelineRunning = false;
     activeProcess = null;
-    broadcast("pipeline_finished", { exitCode: code, finishedAt: new Date().toISOString() });
+    broadcast("pipeline_finished", { 
+      exitCode: code, 
+      finishedAt: new Date().toISOString(),
+      projectId: currentPipelineMeta.projectId,
+      orgId: currentPipelineMeta.orgId
+    });
 
     // Save run to history index
-    saveRunHistory(code);
+    saveRunHistory(code, currentPipelineMeta);
   });
 
   res.json({ success: true, message: "Load test pipeline started" });
@@ -760,7 +774,7 @@ async function seedPastRunsToPostgres() {
   }
 }
 
-async function saveRunHistory(exitCode) {
+async function saveRunHistory(exitCode, meta = {}) {
   try {
     const summaryFile = path.join(REPORT_OUTPUT_DIR, "k6-summary.json");
     if (!fs.existsSync(summaryFile)) return;
@@ -866,6 +880,10 @@ async function saveRunHistory(exitCode) {
     const runId = require("crypto").randomUUID();
     const runData = {
       id: runId,
+      org_id: meta.orgId || config.orgId || null,
+      project_id: meta.projectId || config.projectId || null,
+      environment_id: meta.environmentId || null,
+      triggered_by: meta.triggeredBy || null,
       build_label: config.run?.buildLabel || "build",
       environment: config.run?.environment || "staging",
       target_base_url: config.baseUrl || "http://localhost:8080",

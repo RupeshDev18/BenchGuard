@@ -143,11 +143,26 @@ function switchTab(tabName) {
   if (btn) btn.click();
 }
 
-function refreshIframes() {
+async function refreshIframes() {
   const mgmtIframe = document.getElementById("managementReportIframe");
   const allureIframe = document.getElementById("allureReportIframe");
-  if (mgmtIframe) mgmtIframe.src = "/reports/report.html?t=" + Date.now();
-  if (allureIframe) allureIframe.src = "/reports/allure-report/index.html?t=" + Date.now();
+  
+  let mgmtUrl = "/reports/report.html";
+  let allureUrl = "/reports/allure-report/index.html";
+
+  if (authState.currentProject) {
+    try {
+      const statusRes = await fetch(`/api/projects/${authState.currentProject.id}/reports/status`, { headers: getAuthHeaders() });
+      if (statusRes.ok) {
+        const s = await statusRes.json();
+        if (s.hasManagementReport) mgmtUrl = s.managementReportUrl;
+        if (s.hasAllureReport) allureUrl = s.allureReportUrl;
+      }
+    } catch (e) {}
+  }
+
+  if (mgmtIframe) mgmtIframe.src = `${mgmtUrl}?t=${Date.now()}`;
+  if (allureIframe) allureIframe.src = `${allureUrl}?t=${Date.now()}`;
 }
 
 // -------------------------------------------------------------
@@ -1252,14 +1267,20 @@ async function startPerformanceTest() {
   switchTab("console");
 
   try {
-    const res = await fetch("/api/pipeline/start", {
+    const projId = authState.currentProject?.id;
+    const url = projId ? `/api/projects/${projId}/pipeline/start` : `/api/pipeline/start`;
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cfg),
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        ...cfg,
+        projectId: projId,
+        orgId: authState.currentOrg?.id
+      }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Failed starting pipeline");
-    showToast("Load test execution started!", "info", "Pipeline");
+    showToast(`Load test execution started for ${authState.currentProject?.name || 'project'}!`, "info", "Pipeline");
   } catch (err) {
     showToast("Execution error: " + err.message, "error");
   }
@@ -1268,7 +1289,9 @@ async function startPerformanceTest() {
 async function abortTest() {
   if (confirm("Abort the active load test pipeline immediately?")) {
     try {
-      await fetch("/api/pipeline/stop", { method: "POST" });
+      const projId = authState.currentProject?.id;
+      const url = projId ? `/api/projects/${projId}/pipeline/stop` : `/api/pipeline/stop`;
+      await fetch(url, { method: "POST", headers: getAuthHeaders() });
       showToast("Pipeline abort requested", "warning");
     } catch (err) {
       showToast("Failed aborting test: " + err.message, "error");
