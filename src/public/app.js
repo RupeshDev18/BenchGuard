@@ -26,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   initTabs();
   initWebSocket();
+  initSaasWorkspace();
+  initSaasModals();
   loadConfigAndSpec();
   initDemoSandbox();
   initSpecIngestionControls();
@@ -1404,7 +1406,9 @@ function appendLogLine(text, cssClass = "") {
 // -------------------------------------------------------------
 async function loadRunHistory() {
   try {
-    const res = await fetch("/api/runs");
+    const projId = authState.currentProject?.id;
+    const url = projId ? `/api/projects/${projId}/runs` : `/api/runs`;
+    const res = await fetch(url, { headers: getAuthHeaders() });
     const data = await res.json();
     const history = Array.isArray(data) ? data : (data.runs || []);
     const tbody = document.getElementById("historyTableBody");
@@ -1526,9 +1530,17 @@ function initAnalytics() {
 async function loadAnalytics() {
   try {
     const env = document.getElementById("analyticsEnvFilter")?.value || "all";
+    const projId = authState.currentProject?.id;
+    const trendsUrl = projId
+      ? `/api/projects/${projId}/analytics/trends?env=${encodeURIComponent(env)}`
+      : `/api/analytics/trends?env=${encodeURIComponent(env)}`;
+    const runsUrl = projId
+      ? `/api/projects/${projId}/runs?env=${encodeURIComponent(env)}&limit=50`
+      : `/api/runs?env=${encodeURIComponent(env)}&limit=50`;
+
     const [trendsRes, runsRes] = await Promise.all([
-      fetch(`/api/analytics/trends?env=${encodeURIComponent(env)}`),
-      fetch(`/api/runs?env=${encodeURIComponent(env)}&limit=50`)
+      fetch(trendsUrl, { headers: getAuthHeaders() }),
+      fetch(runsUrl, { headers: getAuthHeaders() })
     ]);
 
     const trends = await trendsRes.json();
@@ -1894,3 +1906,675 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+// ==========================================================================
+// Phase 3: SaaS Multi-Tenant Front-End Engine
+// Organization Switcher • Project Scopes • Team RBAC • Superadmin Portal
+// ==========================================================================
+
+const authState = {
+  token: localStorage.getItem("k6_saas_token") || "",
+  user: JSON.parse(localStorage.getItem("k6_saas_user") || "null"),
+  organizations: [],
+  currentOrg: null,
+  projects: [],
+  currentProject: null,
+  availableTemplates: []
+};
+
+function getAuthHeaders(customHeaders = {}) {
+  const headers = { ...customHeaders };
+  if (authState.token) {
+    headers["Authorization"] = `Bearer ${authState.token}`;
+  }
+  if (authState.currentOrg) {
+    headers["X-Org-Id"] = authState.currentOrg.id;
+  }
+  return headers;
+}
+
+function openModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove("hidden");
+  }
+}
+
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+}
+
+async function initSaasWorkspace() {
+  try {
+    // 1. If no token, auto-login with default seeded Superadmin account
+    if (!authState.token || !authState.user) {
+      await performLogin("superadmin@platform.local", "Admin@12345", false);
+    } else {
+      // Validate existing token
+      const meRes = await fetch("/api/auth/me", { headers: getAuthHeaders() });
+      if (!meRes.ok) {
+        console.warn("[SaaS] Saved token expired. Re-authenticating default superadmin...");
+        await performLogin("superadmin@platform.local", "Admin@12345", false);
+      } else {
+        const meData = await meRes.json();
+        authState.user = meData.user;
+        authState.organizations = meData.organizations || [];
+        updateUserSessionUi();
+        populateOrganizationsDropdown();
+      }
+    }
+  } catch (err) {
+    console.error("[SaaS] Workspace initialization error:", err);
+  }
+}
+
+async function performLogin(email, password, showFeedback = true) {
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Authentication failed");
+    }
+
+    authState.token = data.token;
+    authState.user = data.user;
+    authState.organizations = data.organizations || [];
+
+    localStorage.setItem("k6_saas_token", data.token);
+    localStorage.setItem("k6_saas_user", JSON.stringify(data.user));
+
+    updateUserSessionUi();
+    await populateOrganizationsDropdown();
+
+    if (showFeedback) {
+      showToast(`Authenticated as ${data.user.fullName} (${data.user.email})`, "success", "Welcome");
+    }
+  } catch (err) {
+    if (showFeedback) {
+      showToast(err.message, "error", "Sign In Failed");
+    }
+    throw err;
+  }
+}
+
+function updateUserSessionUi() {
+  const user = authState.user;
+  const nameEl = document.getElementById("userFullNameText");
+  const roleEl = document.getElementById("userRoleBadge");
+  const avatarEl = document.getElementById("userAvatar");
+  const superadminBtn = document.getElementById("openSuperadminBtn");
+
+  if (user) {
+    if (nameEl) nameEl.textContent = user.fullName || user.email;
+    if (roleEl) roleEl.textContent = user.isSuperadmin ? "Platform Owner" : "Org Member";
+    if (avatarEl) {
+      const initial = (user.fullName || user.email || "U")[0].toUpperCase();
+      avatarEl.textContent = initial;
+    }
+    if (superadminBtn) {
+      if (user.isSuperadmin) {
+        superadminBtn.classList.remove("hidden");
+      } else {
+        superadminBtn.classList.add("hidden");
+      }
+    }
+  }
+}
+
+async function populateOrganizationsDropdown() {
+  const orgSelect = document.getElementById("headerOrgSelect");
+  if (!orgSelect) return;
+
+  orgSelect.innerHTML = "";
+  if (!authState.organizations || authState.organizations.length === 0) {
+    orgSelect.innerHTML = `<option value="">No Organizations Found</option>`;
+    return;
+  }
+
+  authState.organizations.forEach((org, idx) => {
+    const opt = document.createElement("option");
+    opt.value = org.id;
+    opt.textContent = `${org.name} (${org.plan_tier ? org.plan_tier.toUpperCase() : 'STARTER'})`;
+    orgSelect.appendChild(opt);
+  });
+
+  // Pick first or previously selected org
+  const savedOrgId = localStorage.getItem("k6_selected_org_id");
+  const matching = authState.organizations.find(o => o.id === savedOrgId);
+  const selectedOrg = matching || authState.organizations[0];
+
+  orgSelect.value = selectedOrg.id;
+  authState.currentOrg = selectedOrg;
+  localStorage.setItem("k6_selected_org_id", selectedOrg.id);
+
+  // Update Plan Badge in header
+  const planBadge = document.getElementById("activePlanBadge");
+  if (planBadge && selectedOrg.plan_tier) {
+    planBadge.textContent = selectedOrg.plan_tier.toUpperCase();
+    planBadge.className = `brand-badge plan-${selectedOrg.plan_tier}`;
+  }
+
+  // Load projects for this organization
+  await loadProjectsForCurrentOrg();
+}
+
+async function loadProjectsForCurrentOrg() {
+  if (!authState.currentOrg) return;
+
+  const projectSelect = document.getElementById("headerProjectSelect");
+  if (!projectSelect) return;
+
+  try {
+    const res = await fetch(`/api/orgs/${authState.currentOrg.id}/projects`, {
+      headers: getAuthHeaders()
+    });
+
+    if (!res.ok) {
+      projectSelect.innerHTML = `<option value="">Failed to load projects</option>`;
+      return;
+    }
+
+    const projects = await res.json();
+    authState.projects = Array.isArray(projects) ? projects : [];
+
+    projectSelect.innerHTML = "";
+    if (authState.projects.length === 0) {
+      projectSelect.innerHTML = `<option value="">+ Create your first project</option>`;
+      authState.currentProject = null;
+      loadRunHistory();
+      loadAnalytics();
+      return;
+    }
+
+    authState.projects.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.name;
+      projectSelect.appendChild(opt);
+    });
+
+    const savedProjectId = localStorage.getItem(`k6_selected_project_${authState.currentOrg.id}`);
+    const matchingProj = authState.projects.find(p => p.id === savedProjectId);
+    const selectedProj = matchingProj || authState.projects[0];
+
+    projectSelect.value = selectedProj.id;
+    authState.currentProject = selectedProj;
+    localStorage.setItem(`k6_selected_project_${authState.currentOrg.id}`, selectedProj.id);
+
+    // Refresh scoped views
+    await onProjectChanged(selectedProj);
+  } catch (err) {
+    console.error("[SaaS] Error loading projects for org:", err);
+  }
+}
+
+async function onProjectChanged(project) {
+  try {
+    const res = await fetch(`/api/projects/${project.id}`, { headers: getAuthHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      
+      // Update Environment Selector if project defines environments
+      if (data.environments && data.environments.length > 0) {
+        const targetEnvSelect = document.getElementById("targetEnvironmentSelect");
+        if (targetEnvSelect) {
+          targetEnvSelect.innerHTML = "";
+          data.environments.forEach(e => {
+            const opt = document.createElement("option");
+            opt.value = e.name;
+            opt.textContent = `${e.name.toUpperCase()} (${e.base_url})`;
+            targetEnvSelect.appendChild(opt);
+          });
+        }
+      }
+    }
+
+    // Refresh history and analytics filtered to this project
+    loadRunHistory();
+    loadAnalytics();
+  } catch (err) {
+    console.error("[SaaS] Error switching project:", err);
+  }
+}
+
+function initSaasModals() {
+  // 1. Organization & Project Switchers
+  const orgSelect = document.getElementById("headerOrgSelect");
+  if (orgSelect) {
+    orgSelect.addEventListener("change", async (e) => {
+      const chosenOrg = authState.organizations.find(o => o.id === e.target.value);
+      if (chosenOrg) {
+        authState.currentOrg = chosenOrg;
+        localStorage.setItem("k6_selected_org_id", chosenOrg.id);
+        showToast(`Switched organization to ${chosenOrg.name}`, "info", "Tenant Switcher");
+        await loadProjectsForCurrentOrg();
+      }
+    });
+  }
+
+  const projectSelect = document.getElementById("headerProjectSelect");
+  if (projectSelect) {
+    projectSelect.addEventListener("change", async (e) => {
+      const chosenProj = authState.projects.find(p => p.id === e.target.value);
+      if (chosenProj) {
+        authState.currentProject = chosenProj;
+        localStorage.setItem(`k6_selected_project_${authState.currentOrg.id}`, chosenProj.id);
+        showToast(`Switched active project to ${chosenProj.name}`, "info", "Project Scope");
+        await onProjectChanged(chosenProj);
+      }
+    });
+  }
+
+  // 2. New Project Modal
+  const openNewProjectBtn = document.getElementById("openNewProjectBtn");
+  if (openNewProjectBtn) {
+    openNewProjectBtn.addEventListener("click", async () => {
+      openModal("newProjectModal");
+      await loadAvailableTemplates();
+    });
+  }
+
+  const closeNewProjectBtn = document.getElementById("closeNewProjectModalBtn");
+  if (closeNewProjectBtn) closeNewProjectBtn.addEventListener("click", () => closeModal("newProjectModal"));
+  const cancelNewProjectBtn = document.getElementById("cancelNewProjectBtn");
+  if (cancelNewProjectBtn) cancelNewProjectBtn.addEventListener("click", () => closeModal("newProjectModal"));
+
+  // Auto-slugify project name
+  const nameInput = document.getElementById("newProjectName");
+  const slugInput = document.getElementById("newProjectSlug");
+  if (nameInput && slugInput) {
+    nameInput.addEventListener("input", (e) => {
+      slugInput.value = e.target.value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+    });
+  }
+
+  // Template cards selection
+  document.querySelectorAll("#templateCardsGrid .template-card").forEach(card => {
+    card.addEventListener("click", () => {
+      document.querySelectorAll("#templateCardsGrid .template-card").forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+    });
+  });
+
+  const submitNewProjectBtn = document.getElementById("submitNewProjectBtn");
+  if (submitNewProjectBtn) {
+    submitNewProjectBtn.addEventListener("click", async () => {
+      if (!authState.currentOrg) {
+        return showToast("Please select a tenant organization first.", "error");
+      }
+
+      const name = nameInput.value.trim();
+      const slug = slugInput.value.trim();
+      const description = document.getElementById("newProjectDesc")?.value.trim() || "";
+      const activeCard = document.querySelector("#templateCardsGrid .template-card.active");
+      const templateId = activeCard ? activeCard.dataset.templateId : "minimal-rest-api";
+
+      if (!name || !slug) {
+        return showToast("Project Name and Slug are required.", "warning");
+      }
+
+      submitNewProjectBtn.disabled = true;
+      submitNewProjectBtn.textContent = "Creating...";
+
+      try {
+        const res = await fetch(`/api/orgs/${authState.currentOrg.id}/projects`, {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ name, slug, description, templateId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to create project");
+        }
+
+        showToast(`Project '${name}' provisioned successfully!`, "success", "Project Ready");
+        closeModal("newProjectModal");
+        nameInput.value = "";
+        slugInput.value = "";
+
+        // Reload projects and switch to newly created one
+        await loadProjectsForCurrentOrg();
+        const projectSelect = document.getElementById("headerProjectSelect");
+        if (projectSelect && data.project) {
+          projectSelect.value = data.project.id;
+          authState.currentProject = data.project;
+          await onProjectChanged(data.project);
+        }
+      } catch (err) {
+        showToast(err.message, "error", "Project Creation Failed");
+      } finally {
+        submitNewProjectBtn.disabled = false;
+        submitNewProjectBtn.textContent = "⚡ Create Project";
+      }
+    });
+  }
+
+  // 3. Superadmin Modal
+  const openSuperadminBtn = document.getElementById("openSuperadminBtn");
+  if (openSuperadminBtn) {
+    openSuperadminBtn.addEventListener("click", async () => {
+      openModal("superadminModal");
+      await loadSuperadminDashboard();
+    });
+  }
+
+  const closeSuperadminModalBtn = document.getElementById("closeSuperadminModalBtn");
+  if (closeSuperadminModalBtn) closeSuperadminModalBtn.addEventListener("click", () => closeModal("superadminModal"));
+  const closeSuperadminPortalBtn = document.getElementById("closeSuperadminPortalBtn");
+  if (closeSuperadminPortalBtn) closeSuperadminPortalBtn.addEventListener("click", () => closeModal("superadminModal"));
+
+  // Admin sub-tabs
+  document.querySelectorAll("[data-admin-tab]").forEach(tabBtn => {
+    tabBtn.addEventListener("click", () => {
+      document.querySelectorAll("[data-admin-tab]").forEach(b => b.classList.remove("active"));
+      tabBtn.classList.add("active");
+
+      const tab = tabBtn.dataset.adminTab;
+      const overviewPanel = document.getElementById("adminTabOverview");
+      const onboardPanel = document.getElementById("adminTabOnboard");
+      const submitBtn = document.getElementById("submitOnboardOrgBtn");
+
+      if (tab === "overview") {
+        overviewPanel.classList.remove("hidden");
+        onboardPanel.classList.add("hidden");
+        submitBtn.classList.add("hidden");
+        loadSuperadminDashboard();
+      } else {
+        overviewPanel.classList.add("hidden");
+        onboardPanel.classList.remove("hidden");
+        submitBtn.classList.remove("hidden");
+      }
+    });
+  });
+
+  // Onboard Org auto-slugify
+  const onboardOrgName = document.getElementById("onboardOrgName");
+  const onboardOrgSlug = document.getElementById("onboardOrgSlug");
+  if (onboardOrgName && onboardOrgSlug) {
+    onboardOrgName.addEventListener("input", (e) => {
+      onboardOrgSlug.value = e.target.value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+    });
+  }
+
+  const submitOnboardOrgBtn = document.getElementById("submitOnboardOrgBtn");
+  if (submitOnboardOrgBtn) {
+    submitOnboardOrgBtn.addEventListener("click", async () => {
+      const orgName = onboardOrgName.value.trim();
+      const orgSlug = onboardOrgSlug.value.trim();
+      const planTier = document.getElementById("onboardPlanTier").value;
+      const maxVusAllowed = parseInt(document.getElementById("onboardMaxVus").value, 10);
+      const maxProjects = parseInt(document.getElementById("onboardMaxProjects").value, 10);
+      const adminFullName = document.getElementById("onboardAdminName").value.trim();
+      const adminEmail = document.getElementById("onboardAdminEmail").value.trim();
+      const adminPassword = document.getElementById("onboardAdminPassword").value;
+
+      if (!orgName || !orgSlug || !adminEmail || !adminPassword) {
+        return showToast("Organization Name, Slug, Admin Email and Password are required.", "warning");
+      }
+
+      submitOnboardOrgBtn.disabled = true;
+      submitOnboardOrgBtn.textContent = "Provisioning...";
+
+      try {
+        const res = await fetch("/api/admin/organizations", {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            orgName, orgSlug, planTier, maxVusAllowed, maxProjects,
+            adminFullName, adminEmail, adminPassword, createStarterProject: true
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Onboarding failed");
+
+        showToast(`Tenant '${orgName}' onboarded with Admin '${adminEmail}'!`, "success", "Tenant Ready");
+        
+        // Reset inputs and return to overview
+        onboardOrgName.value = "";
+        onboardOrgSlug.value = "";
+        document.getElementById("onboardAdminEmail").value = "";
+
+        const overviewTab = document.querySelector("[data-admin-tab='overview']");
+        if (overviewTab) overviewTab.click();
+
+        // Refresh global orgs list
+        const meRes = await fetch("/api/auth/me", { headers: getAuthHeaders() });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          authState.organizations = meData.organizations || [];
+          populateOrganizationsDropdown();
+        }
+      } catch (err) {
+        showToast(err.message, "error", "Onboarding Failed");
+      } finally {
+        submitOnboardOrgBtn.disabled = false;
+        submitOnboardOrgBtn.textContent = "🚀 Provision Organization";
+      }
+    });
+  }
+
+  // 4. Team Modal
+  const openTeamBtn = document.getElementById("openTeamBtn");
+  if (openTeamBtn) {
+    openTeamBtn.addEventListener("click", async () => {
+      openModal("teamModal");
+      await loadTeamMembers();
+    });
+  }
+
+  const closeTeamModalBtn = document.getElementById("closeTeamModalBtn");
+  if (closeTeamModalBtn) closeTeamModalBtn.addEventListener("click", () => closeModal("teamModal"));
+  const closeTeamModalFooterBtn = document.getElementById("closeTeamModalFooterBtn");
+  if (closeTeamModalFooterBtn) closeTeamModalFooterBtn.addEventListener("click", () => closeModal("teamModal"));
+
+  const submitAddMemberBtn = document.getElementById("submitAddMemberBtn");
+  if (submitAddMemberBtn) {
+    submitAddMemberBtn.addEventListener("click", async () => {
+      if (!authState.currentOrg) return;
+
+      const fullName = document.getElementById("newMemberName").value.trim();
+      const email = document.getElementById("newMemberEmail").value.trim();
+      const password = document.getElementById("newMemberPassword").value;
+      const role = document.getElementById("newMemberRole").value;
+
+      if (!email || !password) {
+        return showToast("Member Email and Password are required.", "warning");
+      }
+
+      submitAddMemberBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/orgs/${authState.currentOrg.id}/members`, {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ fullName, email, password, role })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to add member");
+
+        showToast(`Added ${fullName || email} as ${role.toUpperCase()}`, "success", "Member Invited");
+        document.getElementById("newMemberName").value = "";
+        document.getElementById("newMemberEmail").value = "";
+        await loadTeamMembers();
+      } catch (err) {
+        showToast(err.message, "error", "Member Addition Failed");
+      } finally {
+        submitAddMemberBtn.disabled = false;
+      }
+    });
+  }
+
+  // 5. Auth / Session Switcher Modal
+  const userSessionChip = document.getElementById("userSessionChip");
+  if (userSessionChip) {
+    userSessionChip.addEventListener("click", () => {
+      openModal("authModal");
+    });
+  }
+
+  const closeAuthModalBtn = document.getElementById("closeAuthModalBtn");
+  if (closeAuthModalBtn) closeAuthModalBtn.addEventListener("click", () => closeModal("authModal"));
+
+  const quickLoginSuperadminBtn = document.getElementById("quickLoginSuperadminBtn");
+  if (quickLoginSuperadminBtn) {
+    quickLoginSuperadminBtn.addEventListener("click", async () => {
+      try {
+        await performLogin("superadmin@platform.local", "Admin@12345", true);
+        closeModal("authModal");
+      } catch (err) {
+        // handled in performLogin
+      }
+    });
+  }
+
+  const submitCustomLoginBtn = document.getElementById("submitCustomLoginBtn");
+  if (submitCustomLoginBtn) {
+    submitCustomLoginBtn.addEventListener("click", async () => {
+      const email = document.getElementById("loginEmailInput")?.value.trim();
+      const password = document.getElementById("loginPasswordInput")?.value;
+      if (!email || !password) {
+        return showToast("Please enter both email and password", "warning");
+      }
+      try {
+        await performLogin(email, password, true);
+        closeModal("authModal");
+      } catch (err) {
+        // handled in performLogin
+      }
+    });
+  }
+
+  // Close modals when clicking backdrop
+  document.querySelectorAll(".modal-overlay").forEach(overlay => {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        overlay.classList.add("hidden");
+      }
+    });
+  });
+}
+
+async function loadAvailableTemplates() {
+  try {
+    const res = await fetch("/api/orgs/templates/list", { headers: getAuthHeaders() });
+    if (res.ok) {
+      const templates = await res.json();
+      authState.availableTemplates = templates;
+    }
+  } catch (err) {
+    console.warn("Could not load templates:", err);
+  }
+}
+
+async function loadSuperadminDashboard() {
+  try {
+    const [overviewRes, orgsRes] = await Promise.all([
+      fetch("/api/admin/overview", { headers: getAuthHeaders() }),
+      fetch("/api/admin/organizations", { headers: getAuthHeaders() })
+    ]);
+
+    if (overviewRes.ok) {
+      const data = await overviewRes.json();
+      const m = data.metrics || {};
+      const elOrgs = document.getElementById("adminTotalOrgs");
+      const elUsers = document.getElementById("adminTotalUsers");
+      const elProj = document.getElementById("adminTotalProjects");
+      const elRuns = document.getElementById("adminTotalRuns");
+
+      if (elOrgs) elOrgs.textContent = m.totalOrganizations || 0;
+      if (elUsers) elUsers.textContent = m.totalUsers || 0;
+      if (elProj) elProj.textContent = m.totalProjects || 0;
+      if (elRuns) elRuns.textContent = m.totalTestRuns || 0;
+    }
+
+    if (orgsRes.ok) {
+      const orgs = await orgsRes.json();
+      const tbody = document.getElementById("adminOrgsTableBody");
+      if (tbody) {
+        tbody.innerHTML = "";
+        orgs.forEach(o => {
+          const tr = document.createElement("tr");
+          const createdStr = o.created_at ? new Date(o.created_at).toLocaleDateString() : "-";
+          tr.innerHTML = `
+            <td>
+              <div style="font-weight: 700; color: var(--text);">${escapeHtml(o.name)}</div>
+              <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted);">${escapeHtml(o.slug)}</div>
+            </td>
+            <td><span class="plan-badge plan-${o.plan_tier}">${escapeHtml(o.plan_tier)}</span></td>
+            <td style="font-family: var(--font-mono); font-weight: 600;">${o.max_vus_allowed || 100} VUs</td>
+            <td style="font-family: var(--font-mono);">${o.project_count || 0} / ${o.max_projects || 10}</td>
+            <td style="font-family: var(--font-mono);">${o.member_count || 0}</td>
+            <td style="font-family: var(--font-mono); font-weight: 700;">${o.run_count || 0}</td>
+            <td style="font-size: 11px; color: var(--text-muted);">${createdStr}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Superadmin dashboard error:", err);
+  }
+}
+
+async function loadTeamMembers() {
+  if (!authState.currentOrg) return;
+
+  const orgNameEl = document.getElementById("teamOrgName");
+  const orgPlanEl = document.getElementById("teamOrgPlan");
+  const planBadgeEl = document.getElementById("teamPlanBadge");
+  const tbody = document.getElementById("teamMembersTableBody");
+
+  if (orgNameEl) orgNameEl.textContent = authState.currentOrg.name;
+  if (orgPlanEl) orgPlanEl.textContent = `Plan: ${(authState.currentOrg.plan_tier || 'team').toUpperCase()} • Quota: ${authState.currentOrg.max_vus_allowed || 200} VUs`;
+  if (planBadgeEl) {
+    planBadgeEl.textContent = (authState.currentOrg.plan_tier || 'team').toUpperCase();
+    planBadgeEl.className = `plan-badge plan-${authState.currentOrg.plan_tier || 'team'}`;
+  }
+
+  try {
+    const res = await fetch(`/api/orgs/${authState.currentOrg.id}/members`, { headers: getAuthHeaders() });
+    if (!res.ok) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 15px;">Unable to fetch team members.</td></tr>`;
+      return;
+    }
+
+    const members = await res.json();
+    if (tbody) {
+      tbody.innerHTML = "";
+      if (members.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 15px;">No other members in this organization.</td></tr>`;
+      } else {
+        members.forEach(m => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="font-weight: 600; color: var(--text);">${escapeHtml(m.full_name || m.email)}</td>
+            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">${escapeHtml(m.email)}</td>
+            <td><span class="role-pill role-${m.role}">${escapeHtml(m.role)}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Team members fetch error:", err);
+  }
+}
+

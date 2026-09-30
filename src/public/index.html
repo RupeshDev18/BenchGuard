@@ -63,6 +63,42 @@
       </div>
     </div>
 
+    <!-- SaaS Multi-Tenant Workspace & Switcher Bar -->
+    <div class="workspace-bar">
+      <div class="workspace-nav-left">
+        <div class="workspace-item">
+          <span class="workspace-icon">🏢</span>
+          <label for="headerOrgSelect" class="workspace-label">TENANT:</label>
+          <select id="headerOrgSelect" class="workspace-select" title="Switch Tenant Organization"></select>
+        </div>
+        <span class="workspace-slash">/</span>
+        <div class="workspace-item">
+          <span class="workspace-icon">📁</span>
+          <label for="headerProjectSelect" class="workspace-label">PROJECT:</label>
+          <select id="headerProjectSelect" class="workspace-select" title="Switch Project"></select>
+        </div>
+        <button id="openNewProjectBtn" class="btn btn-sm btn-primary" type="button" title="Create New Project or Launch from Starter Kit">
+          + New Project
+        </button>
+      </div>
+
+      <div class="workspace-nav-right">
+        <button id="openTeamBtn" class="btn btn-sm btn-dark" type="button" title="Manage Organization Members & Roles">
+          👥 Team
+        </button>
+        <button id="openSuperadminBtn" class="btn btn-sm btn-dark hidden" type="button" title="Platform Superadmin Portal">
+          🏢 Superadmin Portal
+        </button>
+        <div class="user-session-chip" id="userSessionChip" title="Click to Switch Account or Re-authenticate">
+          <span class="user-avatar" id="userAvatar">A</span>
+          <div class="user-meta">
+            <span class="user-name" id="userFullNameText">Superadmin</span>
+            <span class="user-role-badge" id="userRoleBadge">Platform Owner</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Navigation Tabs -->
     <nav class="app-nav">
       <div class="nav-container">
@@ -823,6 +859,327 @@
       <div class="modal-footer">
         <button id="resetPayloadBtn" class="btn btn-dark" type="button">Reset to Schema Default</button>
         <button id="savePayloadModalBtn" class="btn btn-primary" type="button">Apply to Endpoint</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       SAAS MODAL 1: CREATE NEW PROJECT & STARTER KIT PICKER
+       ==================================================================== -->
+  <div class="modal-overlay hidden" id="newProjectModal">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <div class="modal-title">📁 Create New Performance Testing Project</div>
+        <button id="closeNewProjectModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 13px; color: var(--text-muted);">
+          Projects isolate your OpenAPI specifications, load scenarios, parameterization datasets, and SLA regression history.
+        </div>
+
+        <div class="grid grid-2" style="gap: 16px;">
+          <div class="input-group">
+            <label for="newProjectName">Project Name *</label>
+            <input type="text" id="newProjectName" placeholder="e.g. Payments Gateway API" />
+          </div>
+          <div class="input-group">
+            <label for="newProjectSlug">Project Slug (URL Safe) *</label>
+            <input type="text" id="newProjectSlug" placeholder="e.g. payments-gateway-api" />
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="newProjectDesc">Description (Optional)</label>
+          <input type="text" id="newProjectDesc" placeholder="e.g. Core transactional microservice with PCI-compliant tokenization" />
+        </div>
+
+        <div>
+          <label style="display: block; margin-bottom: 8px; font-weight: 700;">Choose Initialization Template</label>
+          <div class="template-cards-grid" id="templateCardsGrid">
+            <!-- Rendered dynamically by app.js -->
+            <div class="template-card active" data-template-id="minimal-rest-api">
+              <div class="template-card-header">
+                <span class="template-card-title">Minimal REST Service (CRUD)</span>
+                <span class="template-card-badge">REST</span>
+              </div>
+              <div class="template-card-desc">
+                Pre-configured OpenAPI 3.0.3 spec with Items & Orders CRUD endpoints and staging targets.
+              </div>
+              <div class="template-card-features">
+                <span class="template-pill">OpenAPI 3.0.3</span>
+                <span class="template-pill">Dev / Staging</span>
+                <span class="template-pill">Zero Code</span>
+              </div>
+            </div>
+
+            <div class="template-card" data-template-id="spring-boot-ecommerce">
+              <div class="template-card-header">
+                <span class="template-card-title">Spring Boot E-Commerce API</span>
+                <span class="template-card-badge">Full Spec</span>
+              </div>
+              <div class="template-card-desc">
+                Production-grade store with Catalog, Cart, Checkout, Auth tokens, and sample-users CSV dataset.
+              </div>
+              <div class="template-card-features">
+                <span class="template-pill">Catalog & Cart</span>
+                <span class="template-pill">CSV Dataset</span>
+                <span class="template-pill">Auth Tokens</span>
+              </div>
+            </div>
+
+            <div class="template-card" data-template-id="blank">
+              <div class="template-card-header">
+                <span class="template-card-title">Blank Project</span>
+                <span class="template-card-badge">Custom</span>
+              </div>
+              <div class="template-card-desc">
+                Start from scratch. You will upload your own custom OpenAPI/Swagger JSON spec or fetch from URL.
+              </div>
+              <div class="template-card-features">
+                <span class="template-pill">Custom Upload</span>
+                <span class="template-pill">Any Spec</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancelNewProjectBtn" class="btn btn-dark" type="button">Cancel</button>
+        <button id="submitNewProjectBtn" class="btn btn-primary" type="button">⚡ Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       SAAS MODAL 2: PLATFORM SUPERADMIN CONTROL PORTAL
+       ==================================================================== -->
+  <div class="modal-overlay hidden" id="superadminModal">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <div class="modal-title">🏢 Platform Superadmin Control Portal</div>
+        <button id="closeSuperadminModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-sub-nav">
+          <button class="modal-sub-tab active" data-admin-tab="overview">📊 Platform Overview & Tenants</button>
+          <button class="modal-sub-tab" data-admin-tab="onboard">➕ Onboard New Organization</button>
+        </div>
+
+        <!-- Admin Tab 1: Overview -->
+        <div id="adminTabOverview">
+          <div class="grid grid-4" style="gap: 12px; margin-bottom: 20px;">
+            <div class="kpi-card" style="padding: 14px;">
+              <div class="kpi-label">Total Organizations</div>
+              <div class="kpi-value text-primary" id="adminTotalOrgs">0</div>
+            </div>
+            <div class="kpi-card" style="padding: 14px;">
+              <div class="kpi-label">Active Users</div>
+              <div class="kpi-value text-info" id="adminTotalUsers">0</div>
+            </div>
+            <div class="kpi-card" style="padding: 14px;">
+              <div class="kpi-label">Global Projects</div>
+              <div class="kpi-value" id="adminTotalProjects">0</div>
+            </div>
+            <div class="kpi-card" style="padding: 14px;">
+              <div class="kpi-label">Total Test Runs</div>
+              <div class="kpi-value text-success" id="adminTotalRuns">0</div>
+            </div>
+          </div>
+
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Customer Tenant Organizations</div>
+          <div style="overflow-x: auto;">
+            <table class="table" style="width: 100%;" id="adminOrgsTable">
+              <thead>
+                <tr>
+                  <th>Organization</th>
+                  <th>Plan Tier</th>
+                  <th>Max VUs</th>
+                  <th>Projects</th>
+                  <th>Members</th>
+                  <th>Test Runs</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="adminOrgsTableBody">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Admin Tab 2: Onboard -->
+        <div id="adminTabOnboard" class="hidden">
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+            Provision a new B2B tenant organization, set resource quotas, and assign the initial Org Admin account.
+          </div>
+
+          <div class="grid grid-2" style="gap: 14px;">
+            <div class="input-group">
+              <label for="onboardOrgName">Organization Name *</label>
+              <input type="text" id="onboardOrgName" placeholder="e.g. Stripe Payments QA" />
+            </div>
+            <div class="input-group">
+              <label for="onboardOrgSlug">Organization Slug *</label>
+              <input type="text" id="onboardOrgSlug" placeholder="e.g. stripe-payments" />
+            </div>
+          </div>
+
+          <div class="grid grid-3" style="gap: 14px;">
+            <div class="input-group">
+              <label for="onboardPlanTier">Subscription Tier</label>
+              <select id="onboardPlanTier">
+                <option value="starter">Starter (Free, 50 VUs)</option>
+                <option value="team" selected>Team ($149/mo, 200 VUs)</option>
+                <option value="enterprise">Enterprise ($999/mo, 1000 VUs)</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <label for="onboardMaxVus">Max Concurrent VUs</label>
+              <input type="number" id="onboardMaxVus" value="200" />
+            </div>
+            <div class="input-group">
+              <label for="onboardMaxProjects">Max Projects</label>
+              <input type="number" id="onboardMaxProjects" value="10" />
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px;">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Initial Org Admin Account</div>
+            <div class="grid grid-3" style="gap: 14px;">
+              <div class="input-group">
+                <label for="onboardAdminName">Admin Full Name *</label>
+                <input type="text" id="onboardAdminName" placeholder="e.g. Sarah Connor" />
+              </div>
+              <div class="input-group">
+                <label for="onboardAdminEmail">Admin Email *</label>
+                <input type="email" id="onboardAdminEmail" placeholder="admin@client.com" />
+              </div>
+              <div class="input-group">
+                <label for="onboardAdminPassword">Temporary Password *</label>
+                <input type="password" id="onboardAdminPassword" value="Password@123" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="closeSuperadminPortalBtn" class="btn btn-dark" type="button">Close</button>
+        <button id="submitOnboardOrgBtn" class="btn btn-primary hidden" type="button">🚀 Provision Organization</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       SAAS MODAL 3: TEAM & RBAC MANAGEMENT
+       ==================================================================== -->
+  <div class="modal-overlay hidden" id="teamModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">👥 Team Members & Access Roles</div>
+        <button id="closeTeamModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 14px; font-weight: 700;" id="teamOrgName">Acme Corporation</div>
+            <div style="font-size: 11px; color: var(--text-muted);" id="teamOrgPlan">Plan: Team • Quota: 200 VUs</div>
+          </div>
+          <span class="plan-badge plan-team" id="teamPlanBadge">TEAM</span>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px;">Active Members</div>
+          <table class="table" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Email</th>
+                <th>Role</th>
+              </tr>
+            </thead>
+            <tbody id="teamMembersTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 14px;">
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Add New Team Member</div>
+          <div class="grid grid-2" style="gap: 12px;">
+            <div class="input-group">
+              <label for="newMemberName">Full Name</label>
+              <input type="text" id="newMemberName" placeholder="e.g. John Doe" />
+            </div>
+            <div class="input-group">
+              <label for="newMemberEmail">Email Address</label>
+              <input type="email" id="newMemberEmail" placeholder="john@company.com" />
+            </div>
+          </div>
+          <div class="grid grid-2" style="gap: 12px; margin-top: 8px;">
+            <div class="input-group">
+              <label for="newMemberPassword">Temporary Password</label>
+              <input type="password" id="newMemberPassword" value="Password@123" />
+            </div>
+            <div class="input-group">
+              <label for="newMemberRole">Access Role</label>
+              <select id="newMemberRole">
+                <option value="developer" selected>Developer (Run Tests, Edit Scenarios)</option>
+                <option value="viewer">Viewer (View Reports & Analytics)</option>
+                <option value="admin">Admin (Manage Team & Projects)</option>
+              </select>
+            </div>
+          </div>
+          <button id="submitAddMemberBtn" class="btn btn-secondary btn-sm" style="margin-top: 10px;" type="button">
+            + Add Member
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="closeTeamModalFooterBtn" class="btn btn-dark" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       SAAS MODAL 4: AUTHENTICATION & SESSION SWITCHER
+       ==================================================================== -->
+  <div class="modal-overlay hidden" id="authModal">
+    <div class="modal-card" style="max-width: 450px;">
+      <div class="modal-header">
+        <div class="modal-title">🔐 Account & Role Switcher</div>
+        <button id="closeAuthModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 12px; color: var(--text-muted);">
+          Switch between your Superadmin platform owner session or customer Org Admin accounts.
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button id="quickLoginSuperadminBtn" class="btn btn-outline-primary" style="justify-content: flex-start; text-align: left; padding: 10px;" type="button">
+            <div>
+              <div style="font-weight: 700;">⚡ Platform Superadmin</div>
+              <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">superadmin@platform.local</div>
+            </div>
+          </button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin: 6px 0;">
+          <div style="flex: 1; height: 1px; background-color: var(--border);"></div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">OR CUSTOM LOGIN</span>
+          <div style="flex: 1; height: 1px; background-color: var(--border);"></div>
+        </div>
+
+        <div class="input-group">
+          <label for="loginEmailInput">Email</label>
+          <input type="email" id="loginEmailInput" placeholder="user@company.com" />
+        </div>
+        <div class="input-group">
+          <label for="loginPasswordInput">Password</label>
+          <input type="password" id="loginPasswordInput" placeholder="••••••••" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="submitCustomLoginBtn" class="btn btn-primary" type="button">Sign In</button>
       </div>
     </div>
   </div>
