@@ -102,9 +102,21 @@ const envProps = [
   `P95LatencyMs=${(reqDuration["p(95)"] || 0).toFixed(2)} ms`,
   `P99LatencyMs=${(reqDuration["p(99)"] || 0).toFixed(2)} ms`,
   `ErrorRate=${((reqFailed.rate || 0) * 100).toFixed(2)}%`,
+  `DistributedTracing=${config.tracing !== false ? "Enabled (W3C traceparent)" : "Disabled"}`,
+  `APMProvider=${config.apmProvider || "OpenTelemetry / Generic"}`,
+  `APMTraceURLTemplate=${config.apmUrlTemplate || "http://localhost:16686/trace/{traceId}"}`,
 ].join("\n");
 
 fs.writeFileSync(path.join(resultsDir, "environment.properties"), envProps, "utf8");
+
+// Load captured sample traces if available
+let sampleTraces = [];
+const sampleTracesPath = path.join(path.dirname(k6Path), "sample-traces.json");
+if (fs.existsSync(sampleTracesPath)) {
+  try {
+    sampleTraces = JSON.parse(fs.readFileSync(sampleTracesPath, "utf8"));
+  } catch (_) {}
+}
 
 // 2. Write categories.json (Defect & Failure classification)
 const categories = [
@@ -241,6 +253,15 @@ const globalTestCase = {
       source: globalAttachmentName,
       type: "application/json",
     },
+    ...(sampleTraces.length > 0 ? (() => {
+      const traceAttachName = `sample-traces-${globalUuid}.json`;
+      fs.writeFileSync(path.join(resultsDir, traceAttachName), JSON.stringify(sampleTraces, null, 2), "utf8");
+      return [{
+        name: "Captured Distributed Traces (W3C traceparent)",
+        source: traceAttachName,
+        type: "application/json"
+      }];
+    })() : [])
   ],
   labels: [
     { name: "suite", value: "Performance Load Tests" },
@@ -371,6 +392,14 @@ for (const opId of detectedEndpoints) {
         type: "application/json",
       },
     ],
+    links: sampleTraces
+      .filter((t) => t.endpoint === opId)
+      .slice(0, 3)
+      .map((t) => ({
+        name: `APM Trace (${config.apmProvider || "OpenTelemetry"}): ${t.traceId.slice(0, 8)}...`,
+        url: t.apmUrl,
+        type: "custom",
+      })),
     labels: [
       { name: "suite", value: "API Endpoints Performance" },
       { name: "subSuite", value: opId },

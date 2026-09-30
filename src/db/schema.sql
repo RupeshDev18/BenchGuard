@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS project_environments (
     base_url TEXT NOT NULL DEFAULT 'http://localhost:8080',
     default_headers JSONB DEFAULT '{}',
     auth_config JSONB DEFAULT '{}',
+    tracing_enabled BOOLEAN DEFAULT TRUE,
+    apm_provider VARCHAR(64) DEFAULT 'generic',
+    apm_url_template VARCHAR(1024) DEFAULT 'http://localhost:16686/trace/{traceId}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -223,3 +226,12 @@ CREATE TABLE IF NOT EXISTS project_webhooks (
 CREATE INDEX IF NOT EXISTS idx_project_schedules_project ON project_schedules(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_schedules_active ON project_schedules(is_active);
 CREATE INDEX IF NOT EXISTS idx_project_webhooks_project ON project_webhooks(project_id);
+
+-- 15. Migrations & Idempotent Alterations for Distributed Tracing (Phase 6)
+ALTER TABLE project_environments ADD COLUMN IF NOT EXISTS tracing_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE project_environments ADD COLUMN IF NOT EXISTS apm_provider VARCHAR(64) DEFAULT 'generic';
+ALTER TABLE project_environments ADD COLUMN IF NOT EXISTS apm_url_template VARCHAR(1024) DEFAULT 'http://localhost:16686/trace/{traceId}';
+
+ALTER TABLE test_runs ADD COLUMN IF NOT EXISTS sample_traces JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE test_runs ADD COLUMN IF NOT EXISTS apm_provider VARCHAR(64) DEFAULT 'generic';
+ALTER TABLE test_runs ADD COLUMN IF NOT EXISTS apm_url_template TEXT;

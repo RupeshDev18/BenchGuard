@@ -37,7 +37,13 @@ async function saveRun(runData) {
         const orgId = runData.org_id || runData.orgId || null;
         const projectId = runData.project_id || runData.projectId || null;
         const environmentId = runData.environment_id || runData.environmentId || null;
-        const triggeredBy = runData.triggered_by || runData.triggeredBy || null;
+        const rawTriggered = runData.triggered_by || runData.triggeredBy || null;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const triggeredBy = (rawTriggered && uuidRegex.test(rawTriggered)) ? rawTriggered : null;
+
+        const sampleTraces = runData.sample_traces || runData.sampleTraces || [];
+        const apmProvider = runData.apm_provider || runData.apmProvider || 'generic';
+        const apmUrlTemplate = runData.apm_url_template || runData.apmUrlTemplate || 'http://localhost:16686/trace/{traceId}';
 
         let finalOrgId = orgId;
         let finalProjectId = projectId;
@@ -59,11 +65,12 @@ async function saveRun(runData) {
                 failed_requests, error_rate, throughput_rps,
                 p95_latency_ms, p99_latency_ms, avg_latency_ms,
                 med_latency_ms, max_latency_ms, config_snapshot,
-                org_id, project_id, environment_id, triggered_by
+                org_id, project_id, environment_id, triggered_by,
+                sample_traces, apm_provider, apm_url_template
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
                 $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
-                $25, $26, $27, $28
+                $25, $26, $27, $28, $29, $30, $31
             )
             RETURNING *
         `;
@@ -76,7 +83,8 @@ async function saveRun(runData) {
             failedRequests, errorRate, throughputRps,
             p95LatencyMs, p99LatencyMs, avgLatencyMs,
             medLatencyMs, maxLatencyMs, JSON.stringify(configSnapshot),
-            finalOrgId, finalProjectId, environmentId, triggeredBy
+            finalOrgId, finalProjectId, environmentId, triggeredBy,
+            JSON.stringify(sampleTraces), apmProvider, apmUrlTemplate
         ]);
 
         const savedRun = runResult.rows[0];

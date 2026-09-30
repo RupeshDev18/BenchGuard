@@ -107,8 +107,15 @@ async function startProjectPipeline(options) {
         name: environmentName,
         base_url: baseUrl || 'http://localhost:8080',
         default_headers: {},
-        auth_config: {}
+        auth_config: {},
+        tracing_enabled: true,
+        apm_provider: 'generic',
+        apm_url_template: 'http://localhost:16686/trace/{traceId}'
     };
+
+    const tracingEnabled = targetEnv.tracing_enabled !== false;
+    const apmProvider = targetEnv.apm_provider || 'generic';
+    const apmUrlTemplate = targetEnv.apm_url_template || 'http://localhost:16686/trace/{traceId}';
 
     // 3. Fetch dataset if any
     const datasetRes = await query(
@@ -158,6 +165,9 @@ async function startProjectPipeline(options) {
         endpointConfigs: activeSpec.endpoint_configs || {},
         headers: targetEnv.default_headers || {},
         auth: targetEnv.auth_config || {},
+        tracing: tracingEnabled,
+        apmProvider: apmProvider,
+        apmUrlTemplate: apmUrlTemplate,
         run: {
             buildLabel: buildLabel,
             environment: targetEnv.name || "staging"
@@ -191,9 +201,31 @@ async function startProjectPipeline(options) {
         startTime: new Date().toISOString()
     });
 
+    const sampleTraces = [];
+
     child.stdout.on('data', (chunk) => {
         const text = chunk.toString();
         broadcaster.broadcast('log', { text, stream: 'stdout', projectId, orgId, runId });
+
+        // Parse and capture sample trace IDs output by k6 generator
+        const lines = text.split('\n');
+        for (const line of lines) {
+            const match = line.match(/\[TRACE-SAMPLE\]\s+op=([^\s]+)\s+traceId=([a-f0-9]{32})\s+spanId=([a-f0-9]{16})\s+traceparent=([^\s]+)/i);
+            if (match && sampleTraces.length < 25) {
+                const opId = match[1];
+                const traceId = match[2];
+                const spanId = match[3];
+                const traceparent = match[4];
+                sampleTraces.push({
+                    endpoint: opId,
+                    traceId,
+                    spanId,
+                    traceparent,
+                    apmUrl: apmUrlTemplate.replace('{traceId}', traceId),
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
     });
 
     child.stderr.on('data', (chunk) => {
@@ -274,6 +306,26 @@ async function startProjectPipeline(options) {
                 const maxAllowedP95 = thresholds.p95Ms !== undefined ? thresholds.p95Ms : 500;
                 slaVerdict = (errRate <= maxAllowedErrorRate && p95 <= maxAllowedP95) ? 'PASSED' : 'FAILED';
 
+                // Persist captured sample traces to disk & DB
+                let finalSampleTraces = sampleTraces;
+                const tracesPath = path.join(runDir, 'sample-traces.json');
+                if ((!finalSampleTraces || finalSampleTraces.length === 0) && fs.existsSync(tracesPath)) {
+                    try {
+                        finalSampleTraces = JSON.parse(fs.readFileSync(tracesPath, 'utf8'));
+                    } catch (_) {}
+                }
+
+                if (finalSampleTraces && finalSampleTraces.length > 0) {
+                    try {
+                        if (!fs.existsSync(tracesPath)) {
+                            fs.writeFileSync(tracesPath, JSON.stringify(finalSampleTraces, null, 2), 'utf8');
+                        }
+                        fs.writeFileSync(path.join(latestDir, 'sample-traces.json'), JSON.stringify(finalSampleTraces, null, 2), 'utf8');
+                    } catch (traceSaveErr) {
+                        console.warn(`[tenant-run] Failed saving sample-traces.json: ${traceSaveErr.message}`);
+                    }
+                }
+
                 // Save run record to PostgreSQL
                 savedRunRecord = await saveRun({
                     id: runId,
@@ -306,7 +358,10 @@ async function startProjectPipeline(options) {
                     org_id: orgId,
                     project_id: projectId,
                     environment_id: targetEnv.id || null,
-                    triggered_by: triggeredBy
+                    triggered_by: triggeredBy,
+                    sample_traces: finalSampleTraces || [],
+                    apm_provider: apmProvider,
+                    apm_url_template: apmUrlTemplate
                 });
             }
         } catch (dbErr) {

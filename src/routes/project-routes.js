@@ -160,25 +160,31 @@ router.get('/:projectId/environments', requireProjectRole(['admin', 'developer',
 
 /**
  * POST /api/projects/:projectId/environments
- * Add or update an environment.
+ * Add or create an environment with optional APM & Distributed Tracing settings.
  */
 router.post('/:projectId/environments', requireProjectRole(['admin', 'developer']), async (req, res) => {
-    const { name, baseUrl, defaultHeaders, authConfig } = req.body;
+    const { name, baseUrl, defaultHeaders, authConfig, tracingEnabled, apmProvider, apmUrlTemplate } = req.body;
     if (!name || !baseUrl) {
         return res.status(400).json({ error: 'Environment name and baseUrl are required.' });
     }
 
     try {
         const envRes = await query(`
-            INSERT INTO project_environments (project_id, name, base_url, default_headers, auth_config)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO project_environments (
+                project_id, name, base_url, default_headers, auth_config,
+                tracing_enabled, apm_provider, apm_url_template
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
         `, [
             req.project.id,
             name.toLowerCase().trim(),
             baseUrl.trim(),
             JSON.stringify(defaultHeaders || {}),
-            JSON.stringify(authConfig || {})
+            JSON.stringify(authConfig || {}),
+            tracingEnabled !== undefined ? Boolean(tracingEnabled) : true,
+            apmProvider || 'generic',
+            apmUrlTemplate || 'http://localhost:16686/trace/{traceId}'
         ]);
 
         res.status(201).json({
@@ -187,6 +193,47 @@ router.post('/:projectId/environments', requireProjectRole(['admin', 'developer'
         });
     } catch (err) {
         res.status(500).json({ error: 'Failed to create environment: ' + err.message });
+    }
+});
+
+/**
+ * PATCH /api/projects/:projectId/environments/:envId
+ * Update environment settings, including base URL, headers, and APM tracing options.
+ */
+router.patch('/:projectId/environments/:envId', requireProjectRole(['admin', 'developer']), async (req, res) => {
+    const { baseUrl, defaultHeaders, authConfig, tracingEnabled, apmProvider, apmUrlTemplate } = req.body;
+    try {
+        const updateRes = await query(`
+            UPDATE project_environments
+            SET base_url = COALESCE($1, base_url),
+                default_headers = COALESCE($2, default_headers),
+                auth_config = COALESCE($3, auth_config),
+                tracing_enabled = COALESCE($4, tracing_enabled),
+                apm_provider = COALESCE($5, apm_provider),
+                apm_url_template = COALESCE($6, apm_url_template)
+            WHERE id = $7 AND project_id = $8
+            RETURNING *
+        `, [
+            baseUrl ? baseUrl.trim() : null,
+            defaultHeaders ? JSON.stringify(defaultHeaders) : null,
+            authConfig ? JSON.stringify(authConfig) : null,
+            tracingEnabled !== undefined ? Boolean(tracingEnabled) : null,
+            apmProvider || null,
+            apmUrlTemplate || null,
+            req.params.envId,
+            req.project.id
+        ]);
+
+        if (updateRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Environment not found.' });
+        }
+
+        res.json({
+            message: 'Environment updated successfully.',
+            environment: updateRes.rows[0]
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update environment: ' + err.message });
     }
 });
 

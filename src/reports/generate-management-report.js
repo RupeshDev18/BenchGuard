@@ -37,6 +37,15 @@ if (contractPath && fs.existsSync(contractPath)) {
   }
 }
 
+// Load captured sample traces if available
+let sampleTraces = [];
+const tracesPath = path.join(path.dirname(k6Path), "sample-traces.json");
+if (fs.existsSync(tracesPath)) {
+  try {
+    sampleTraces = JSON.parse(fs.readFileSync(tracesPath, "utf8"));
+  } catch (_) {}
+}
+
 // Ensure output directory exists
 const outDir = path.dirname(outPath);
 if (!fs.existsSync(outDir)) {
@@ -474,6 +483,8 @@ const html = `<!DOCTYPE html>
         <span class="meta-tag">Build: <strong>${config.run?.buildLabel || "v1.0"}</strong></span>
         <span class="meta-tag">Environment: <strong>${config.run?.environment || "staging"}</strong></span>
         <span class="meta-tag">Base URL: <strong>${config.baseUrl || "http://localhost:8080"}</strong></span>
+        <span class="meta-tag">Tracing: <strong>${config.tracing !== false ? "W3C traceparent (Active)" : "Disabled"}</strong></span>
+        <span class="meta-tag">APM: <strong>${config.apmProvider || "OpenTelemetry"}</strong></span>
         <span class="meta-tag">Run Time: <strong>${executionDate}</strong></span>
       </div>
     </div>
@@ -608,6 +619,53 @@ const html = `<!DOCTYPE html>
           .join("")}
       </tbody>
     </table>
+  </div>
+
+  <!-- Distributed Tracing & APM Section -->
+  <div class="section-title">
+    Distributed Tracing & APM Observability
+    <span>W3C Trace Context • ${config.apmProvider || "OpenTelemetry"}</span>
+  </div>
+  <div class="contract-box" style="margin-bottom: 32px;">
+    <div style="display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap;">
+      <div>Protocol Standard: <strong>W3C Trace Context (traceparent, baggage)</strong></div>
+      <div>APM Provider: <strong>${config.apmProvider || "OpenTelemetry"}</strong></div>
+      <div>Tracer URL: <code>${config.apmUrlTemplate || "http://localhost:16686/trace/{traceId}"}</code></div>
+    </div>
+    ${
+      sampleTraces.length > 0
+        ? `
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+          Live sample traces captured during benchmark. Correlate client load requests directly with backend microservice waterfall spans:
+        </div>
+        <div class="table-container" style="margin-bottom: 0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Target Endpoint</th>
+                <th>Trace ID</th>
+                <th>W3C Traceparent Header</th>
+                <th>APM Span Deep-Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sampleTraces.slice(0, 10).map((t) => `
+                <tr>
+                  <td><strong>${t.endpoint}</strong></td>
+                  <td><code>${t.traceId}</code></td>
+                  <td><span class="code-tag">${t.traceparent}</span></td>
+                  <td>
+                    <a href="${t.apmUrl}" target="_blank" class="btn btn-primary" style="padding: 4px 10px; font-size: 12px; text-decoration: none;">
+                      Inspect in APM &rarr;
+                    </a>
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>`
+        : `<p style="color: var(--text-muted); font-size: 13px;">Distributed tracing headers (<code>traceparent</code>, <code>baggage</code>, <code>x-trace-id</code>) were injected into outgoing load requests. Downstream microservices can propagate spans to Jaeger, Zipkin, or Datadog.</p>`
+    }
   </div>
 
   <!-- Contract Testing Section -->

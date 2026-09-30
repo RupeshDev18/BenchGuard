@@ -40,6 +40,24 @@ const server = http.createServer(async (req, res) => {
   res.setHeader("X-Service-Name", "Spring-Boot-Core-API");
   res.setHeader("X-Response-Time-Ms", String(delay));
 
+  // Distributed Tracing: Inspect & propagate W3C traceparent and baggage
+  const traceparent = req.headers["traceparent"];
+  const baggage = req.headers["baggage"];
+  const xTraceId = req.headers["x-trace-id"];
+
+  if (traceparent) {
+    res.setHeader("traceresponse", traceparent);
+    const traceMatch = String(traceparent).match(/^00-([0-9a-f]{32})-/i);
+    if (traceMatch) {
+      res.setHeader("X-Trace-Id", traceMatch[1]);
+    }
+  } else if (xTraceId) {
+    res.setHeader("X-Trace-Id", xTraceId);
+  }
+  if (baggage) {
+    res.setHeader("X-Echoed-Baggage", String(baggage));
+  }
+
   // Health endpoint
   if (method === "GET" && pathname === "/api/v1/health") {
     res.writeHead(200);

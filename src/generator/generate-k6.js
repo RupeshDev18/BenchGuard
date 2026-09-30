@@ -262,14 +262,49 @@ if (!customHeaders["Content-Type"]) {
   customHeaders["Content-Type"] = "application/json";
 }
 const headersJson = JSON.stringify(customHeaders);
+const enableTracing = config.tracing !== false;
+
+// ---------- Pure JS W3C Traceparent Generator for k6 Runtime ----------
+const tracingHelper = `
+function generateTraceparent() {
+  function hex(len) {
+    var out = '';
+    var chars = '0123456789abcdef';
+    for (var i = 0; i < len; i++) {
+      out += chars.charAt(Math.floor(Math.random() * 16));
+    }
+    return out;
+  }
+  var traceId = hex(32);
+  var spanId = hex(16);
+  return {
+    traceId: traceId,
+    spanId: spanId,
+    traceparent: '00-' + traceId + '-' + spanId + '-01',
+    baggage: 'k6.vu=' + (typeof __VU !== 'undefined' ? __VU : 1) + ',k6.iter=' + (typeof __ITER !== 'undefined' ? __ITER : 0)
+  };
+}
+`;
 
 // ---------- Build k6 Request Statements ----------
 const requestStatements = endpoints
   .map((ep) => {
     const urlExpr = `\`\${BASE_URL}${ep.route}\``;
+    const traceSetup = enableTracing ? `    const trace = generateTraceparent();
+    const reqHeaders = Object.assign({}, HEADERS, {
+      "traceparent": trace.traceparent,
+      "baggage": trace.baggage,
+      "x-trace-id": trace.traceId
+    });
+    if (__ITER < 3 && __VU <= 2) {
+      console.log("[TRACE-SAMPLE] op=" + "${ep.opId}" + " traceId=" + trace.traceId + " spanId=" + trace.spanId + " traceparent=" + trace.traceparent);
+    }` : `    const reqHeaders = HEADERS;`;
+
+    const tagTraceSnippet = enableTracing ? `, trace_id: trace.traceId` : ``;
+
     const paramsExpr = `{
-      headers: HEADERS,
-      tags: { endpoint: "${ep.opId}", tag: "${ep.tag}", route: "${ep.originalRoute}" }
+      headers: reqHeaders,
+      tags: { endpoint: "${ep.opId}", tag: "${ep.tag}", route: "${ep.originalRoute}"${tagTraceSnippet} }
     }`;
 
     const statusCheckList = JSON.stringify(ep.expectedStatuses);
@@ -278,6 +313,7 @@ const requestStatements = endpoints
     if (ep.method === "GET" || ep.method === "DELETE") {
       return `  // [${ep.tag}] ${ep.opId} - ${ep.summary}
   group("${ep.tag} - ${ep.opId}", function () {
+${traceSetup}
     const res = http.${ep.method.toLowerCase()}(${urlExpr}, ${paramsExpr});
     check(res, {
       "${ep.opId} status in ${statusCheckList}": (r) => ${statusCheckExpr},
@@ -289,6 +325,7 @@ const requestStatements = endpoints
     const payloadTemplate = JSON.stringify(ep.body || {});
     return `  // [${ep.tag}] ${ep.opId} - ${ep.summary}
   group("${ep.tag} - ${ep.opId}", function () {
+${traceSetup}
     const rawPayload = ${payloadTemplate};
     const resolvedPayload = resolveDynamicValues(rawPayload, currentUser);
     const res = http.${ep.method.toLowerCase()}(${urlExpr}, JSON.stringify(resolvedPayload), ${paramsExpr});
@@ -345,6 +382,7 @@ const BASE_URL = "${baseUrl}";
 const HEADERS = ${headersJson};
 
 ${resolverHelper}
+${enableTracing ? tracingHelper : ""}
 
 export const options = {
   ${loadSnippet}
