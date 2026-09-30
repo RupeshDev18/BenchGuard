@@ -144,9 +144,9 @@ async function saveRun(runData) {
 }
 
 /**
- * Retrieves a paginated list of test runs.
+ * Retrieves a paginated list of test runs, optionally scoped by project/org/environment.
  */
-async function getRuns({ limit = 30, offset = 0, environment = null } = {}) {
+async function getRuns({ limit = 30, offset = 0, environment = null, projectId = null, orgId = null } = {}) {
     let queryText = `
         SELECT 
             r.*,
@@ -155,22 +155,52 @@ async function getRuns({ limit = 30, offset = 0, environment = null } = {}) {
         FROM test_runs r
     `;
     const params = [];
+    const whereClauses = [];
+
+    if (projectId) {
+        params.push(projectId);
+        whereClauses.push(`r.project_id = $${params.length}`);
+    }
+
+    if (orgId) {
+        params.push(orgId);
+        whereClauses.push(`r.org_id = $${params.length}`);
+    }
 
     if (environment && environment !== 'all') {
         params.push(environment);
-        queryText += ` WHERE r.environment = $${params.length}`;
+        whereClauses.push(`r.environment = $${params.length}`);
+    }
+
+    if (whereClauses.length > 0) {
+        queryText += ` WHERE ` + whereClauses.join(' AND ');
     }
 
     queryText += ` ORDER BY r.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
-    const totalCountQuery = environment && environment !== 'all'
-        ? `SELECT COUNT(*) FROM test_runs WHERE environment = $1`
-        : `SELECT COUNT(*) FROM test_runs`;
+    let totalCountQuery = `SELECT COUNT(*) FROM test_runs r`;
+    const countParams = [];
+    const countWhere = [];
+    if (projectId) {
+        countParams.push(projectId);
+        countWhere.push(`r.project_id = $${countParams.length}`);
+    }
+    if (orgId) {
+        countParams.push(orgId);
+        countWhere.push(`r.org_id = $${countParams.length}`);
+    }
+    if (environment && environment !== 'all') {
+        countParams.push(environment);
+        countWhere.push(`r.environment = $${countParams.length}`);
+    }
+    if (countWhere.length > 0) {
+        totalCountQuery += ` WHERE ` + countWhere.join(' AND ');
+    }
 
     const [listRes, countRes] = await Promise.all([
         db.query(queryText, params),
-        db.query(totalCountQuery, environment && environment !== 'all' ? [environment] : [])
+        db.query(totalCountQuery, countParams)
     ]);
 
     return {
@@ -216,6 +246,14 @@ async function getRunById(idOrNumber) {
 }
 
 /**
+ * Retrieves endpoint run metrics for a run.
+ */
+async function getEndpointMetricsForRun(runId) {
+    const res = await db.query('SELECT * FROM endpoint_run_metrics WHERE run_id = $1 ORDER BY p95_ms DESC', [runId]);
+    return res.rows;
+}
+
+/**
  * Retrieves second-by-second timeseries points for charting.
  */
 async function getRunTimeseries(runId) {
@@ -231,7 +269,7 @@ async function getRunTimeseries(runId) {
 /**
  * Retrieves regression analytics and performance trends across releases/builds.
  */
-async function getPerformanceTrends({ environment = null, limit = 15 } = {}) {
+async function getPerformanceTrends({ environment = null, limit = 15, projectId = null, orgId = null } = {}) {
     let queryText = `
         SELECT 
             id, run_number, build_label, environment,
@@ -242,10 +280,25 @@ async function getPerformanceTrends({ environment = null, limit = 15 } = {}) {
         FROM test_runs
     `;
     const params = [];
+    const whereClauses = [];
+
+    if (projectId) {
+        params.push(projectId);
+        whereClauses.push(`project_id = $${params.length}`);
+    }
+
+    if (orgId) {
+        params.push(orgId);
+        whereClauses.push(`org_id = $${params.length}`);
+    }
 
     if (environment && environment !== 'all') {
         params.push(environment);
-        queryText += ` WHERE environment = $${params.length}`;
+        whereClauses.push(`environment = $${params.length}`);
+    }
+
+    if (whereClauses.length > 0) {
+        queryText += ` WHERE ` + whereClauses.join(' AND ');
     }
 
     queryText += ` ORDER BY started_at ASC LIMIT $${params.length + 1}`;
@@ -258,7 +311,10 @@ async function getPerformanceTrends({ environment = null, limit = 15 } = {}) {
 module.exports = {
     saveRun,
     getRuns,
+    listTestRuns: getRuns,
     getRunById,
+    getTestRunById: getRunById,
+    getEndpointMetricsForRun,
     getRunTimeseries,
     getPerformanceTrends
 };

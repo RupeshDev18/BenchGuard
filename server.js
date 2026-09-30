@@ -16,6 +16,12 @@ const multer = require("multer");
 const db = require("./src/db/database");
 const runRepository = require("./src/db/run-repository");
 
+// SaaS Multi-Tenant Routers
+const authRoutes = require("./src/routes/auth-routes");
+const adminRoutes = require("./src/routes/admin-routes");
+const orgRoutes = require("./src/routes/org-routes");
+const projectRoutes = require("./src/routes/project-routes");
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -27,6 +33,12 @@ const REPORT_OUTPUT_DIR = path.join(ROOT_DIR, "report-output");
 
 app.use(cors());
 app.use(express.json());
+
+// Mount SaaS API Routers
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/orgs", orgRoutes);
+app.use("/api/projects", projectRoutes);
 
 // Serve static assets for the UI
 app.use(express.static(path.join(ROOT_DIR, "src/public")));
