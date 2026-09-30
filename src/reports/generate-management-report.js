@@ -77,7 +77,8 @@ for (const [metricName, m] of Object.entries(k6.metrics || {})) {
 }
 
 const allThresholdsPassed = thresholdResults.every((t) => t.ok);
-const errorRatePct = ((failed.rate || 0) * 100).toFixed(2);
+const failedRate = failed.value !== undefined ? failed.value : (failed.rate !== undefined ? failed.rate : (failed.passes && (failed.passes + (failed.fails || 0)) > 0 ? (failed.passes / (failed.passes + (failed.fails || 0))) : 0));
+const errorRatePct = (failedRate * 100).toFixed(2);
 const overallPassed = contract ? allThresholdsPassed && (contract.failed || 0) === 0 : allThresholdsPassed;
 
 // Extract endpoint-level performance metrics

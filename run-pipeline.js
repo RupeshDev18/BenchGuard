@@ -140,6 +140,7 @@ try {
   const dur = getM("http_req_duration");
   const reqs = getM("http_reqs");
   const failed = getM("http_req_failed");
+  const failedRate = failed.value !== undefined ? failed.value : (failed.rate !== undefined ? failed.rate : (failed.passes && (failed.passes + (failed.fails || 0)) > 0 ? (failed.passes / (failed.passes + (failed.fails || 0))) : 0));
   const vus = getM("vus_max");
 
   const record = {
@@ -154,7 +155,7 @@ try {
     avg: dur.avg || 0,
     throughput: reqs.rate || 0,
     totalRequests: reqs.count || 0,
-    errorRate: ((failed.rate || 0) * 100).toFixed(2),
+    errorRate: (failedRate * 100).toFixed(2),
     peakVus: vus.value || 0,
   };
 

@@ -763,18 +763,9 @@ async function saveRunHistory(exitCode) {
     const dur = getM("http_req_duration");
     const reqs = getM("http_reqs");
     const failed = getM("http_req_failed");
-    const vus = getM("vus_max");
-    const config = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")) : {};
-
-    const p95 = dur["p(95)"] || 0;
-    const p99 = dur["p(99)"] || 0;
-    const avg = dur.avg || 0;
-    const med = dur.med || 0;
-    const max = dur.max || 0;
-    const throughput = reqs.rate || 0;
-    const totalRequests = reqs.count || 0;
-    const failedRequests = failed.passes || 0;
-    const errorRate = Number(((failed.rate || 0) * 100).toFixed(2));
+    const failedRate = failed.value !== undefined ? failed.value : (failed.rate !== undefined ? failed.rate : (failed.passes && (failed.passes + (failed.fails || 0)) > 0 ? (failed.passes / (failed.passes + (failed.fails || 0))) : 0));
+    const failedRequests = failed.passes !== undefined ? failed.passes : Math.round((reqs.count || 0) * failedRate);
+    const errorRate = Number((failedRate * 100).toFixed(2));
     const peakVus = vus.value || 0;
 
     // Determine test duration in seconds
