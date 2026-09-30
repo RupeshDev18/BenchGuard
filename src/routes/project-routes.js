@@ -18,12 +18,20 @@ const runRepository = require('../db/run-repository');
 const { authenticateToken, requireProjectRole } = require('../auth/middlewares');
 const { randomUUID } = require('crypto');
 const broadcaster = require('../utils/broadcaster');
+const {
+    startProjectPipeline,
+    stopProjectPipeline,
+    isProjectPipelineRunning,
+    getProjectPipelineInfo
+} = require('../execution/project-executor');
+const {
+    registerSchedule,
+    unregisterSchedule,
+    executeScheduledRun
+} = require('../scheduler/cron-scheduler');
 
 const ROOT_DIR = path.resolve(__dirname, '../../');
 const DATA_DIR = path.join(ROOT_DIR, 'data/tenants');
-
-// Track running processes per project
-const activeProjectProcesses = new Map();
 
 // Multer storage for project-specific datasets and specs
 const storage = multer.diskStorage({
@@ -466,11 +474,11 @@ router.get('/:projectId/analytics/trends', requireProjectRole(['admin', 'develop
  * GET /api/projects/:projectId/pipeline/status
  */
 router.get('/:projectId/pipeline/status', requireProjectRole(['admin', 'developer', 'viewer']), (req, res) => {
-    const runningInfo = activeProjectProcesses.get(req.project.id);
+    const info = getProjectPipelineInfo(req.project.id);
     res.json({
-        running: !!runningInfo,
-        runId: runningInfo?.runId || null,
-        startedAt: runningInfo?.startedAt || null
+        running: !!info,
+        runId: info?.runId || null,
+        startedAt: info?.startedAt || null
     });
 });
 
@@ -478,24 +486,11 @@ router.get('/:projectId/pipeline/status', requireProjectRole(['admin', 'develope
  * POST /api/projects/:projectId/pipeline/stop
  */
 router.post('/:projectId/pipeline/stop', requireProjectRole(['admin', 'developer']), (req, res) => {
-    const runningInfo = activeProjectProcesses.get(req.project.id);
-    if (!runningInfo || !runningInfo.process) {
-        return res.status(400).json({ error: 'No active pipeline running for this project.' });
+    const stopped = stopProjectPipeline(req.project.id);
+    if (!stopped) {
+        return res.status(400).json({ error: 'No active performance pipeline running for this project.' });
     }
-
-    try {
-        runningInfo.process.kill();
-        activeProjectProcesses.delete(req.project.id);
-        broadcaster.broadcast('pipeline_aborted', {
-            projectId: req.project.id,
-            orgId: req.project.org_id,
-            runId: runningInfo.runId,
-            message: 'Pipeline aborted by user'
-        });
-        res.json({ success: true, message: 'Project pipeline execution aborted.' });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to abort pipeline: ' + err.message });
-    }
+    res.json({ success: true, message: 'Project pipeline execution aborted.' });
 });
 
 /**
@@ -503,259 +498,255 @@ router.post('/:projectId/pipeline/stop', requireProjectRole(['admin', 'developer
  * Executes an isolated k6 & Allure performance test pipeline scoped to this project.
  */
 router.post('/:projectId/pipeline/start', requireProjectRole(['admin', 'developer']), async (req, res) => {
-    const projectId = req.project.id;
-    const orgId = req.project.org_id;
-
-    if (activeProjectProcesses.has(projectId)) {
-        return res.status(409).json({ error: 'A performance pipeline is already running for this project.' });
-    }
-
     try {
-        // 1. Fetch active OpenAPI spec
-        const specRes = await query(
-            'SELECT * FROM project_specs WHERE project_id = $1 AND is_active = TRUE ORDER BY updated_at DESC LIMIT 1',
-            [projectId]
-        );
-        let activeSpec = specRes.rows[0];
-        if (!activeSpec) {
-            const sampleSpecPath = path.resolve(__dirname, '../../sample-openapi.json');
-            if (fs.existsSync(sampleSpecPath)) {
-                try {
-                    const sampleContent = JSON.parse(fs.readFileSync(sampleSpecPath, 'utf8'));
-                    const insRes = await query(
-                        `INSERT INTO project_specs (project_id, name, version, format, raw_content, endpoint_configs, is_active)
-                         VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-                         RETURNING *`,
-                        [projectId, 'Default OpenAPI Specification', '3.0.3', 'json', sampleContent, {}]
-                    );
-                    activeSpec = insRes.rows[0];
-                } catch (e) {
-                    console.warn(`[Pipeline] Failed to create fallback spec: ${e.message}`);
-                }
-            }
-        }
-        if (!activeSpec) {
-            return res.status(400).json({ error: 'Cannot run test: Project has no active OpenAPI specification. Please upload or activate a spec.' });
-        }
-
-        // 2. Fetch environment
-        const requestedEnv = req.body.environment || req.body.envName || 'staging';
-        const envRes = await query(
-            'SELECT * FROM project_environments WHERE project_id = $1 AND (LOWER(name) = LOWER($2) OR id::text = $2) LIMIT 1',
-            [projectId, requestedEnv]
-        );
-        const targetEnv = envRes.rows[0] || {
-            name: requestedEnv,
-            base_url: req.body.baseUrl || 'http://localhost:8080',
-            default_headers: {},
-            auth_config: {}
-        };
-
-        // 3. Fetch dataset if any
-        const datasetRes = await query(
-            'SELECT * FROM project_datasets WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1',
-            [projectId]
-        );
-        const activeDataset = datasetRes.rows[0] || null;
-
-        // 4. Create isolated tenant execution directory
-        const runId = randomUUID();
-        const tenantDir = path.join(ROOT_DIR, 'report-output', 'tenants', orgId, projectId);
-        const runDir = path.join(tenantDir, 'runs', runId);
-        const latestDir = path.join(tenantDir, 'latest');
-        fs.mkdirSync(runDir, { recursive: true });
-        fs.mkdirSync(latestDir, { recursive: true });
-
-        // Write isolated spec file
-        const isolatedSpecPath = path.join(runDir, 'openapi-spec.json');
-        fs.writeFileSync(isolatedSpecPath, JSON.stringify(activeSpec.raw_content, null, 2), 'utf8');
-
-        // Build isolated configuration
-        const stages = req.body.stages && req.body.stages.length > 0
-            ? req.body.stages
-            : [{ duration: "10s", target: req.body.peakVus ? parseInt(req.body.peakVus, 10) : 10 }];
-
-        const testDurationSec = stages.reduce((sum, s) => {
-            const val = parseInt(s.duration, 10);
-            return sum + (isNaN(val) ? 5 : val);
-        }, 0);
-
-        const isolatedConfig = {
-            baseUrl: targetEnv.base_url,
-            specTitle: activeSpec.name,
-            specVersion: activeSpec.version,
-            specFormat: activeSpec.format,
-            openapiPath: path.relative(runDir, isolatedSpecPath),
-            datasetPath: activeDataset ? path.resolve(ROOT_DIR, activeDataset.file_path) : undefined,
-            stages: stages,
-            thresholds: req.body.thresholds || {
-                p95Ms: req.body.p95ThresholdMs || 500,
-                p99Ms: 1000,
-                maxErrorRate: 1.0
-            },
-            endpoints: req.body.endpoints || { include: ["all"], exclude: [] },
-            endpointConfigs: activeSpec.endpoint_configs || {},
-            headers: targetEnv.default_headers || {},
-            auth: targetEnv.auth_config || {},
-            run: {
-                buildLabel: req.body.buildLabel || "v1.0.0",
-                environment: targetEnv.name || "staging"
-            },
-            orgId,
-            projectId,
-            environmentId: targetEnv.id || null
-        };
-
-        const configPath = path.join(runDir, 'config.json');
-        fs.writeFileSync(configPath, JSON.stringify(isolatedConfig, null, 2), 'utf8');
-
-        // 5. Spawn test pipeline
-        const child = spawn('node', [
-            'run-pipeline.js',
-            '--config', path.relative(ROOT_DIR, configPath),
-            '--out', path.relative(ROOT_DIR, runDir)
-        ], {
-            cwd: ROOT_DIR,
-            shell: true
-        });
-
-        activeProjectProcesses.set(projectId, { process: child, runId, startedAt: new Date() });
-
-        broadcaster.broadcast('pipeline_started', {
-            projectId,
-            orgId,
-            runId,
-            environment: targetEnv.name,
-            buildLabel: isolatedConfig.run.buildLabel,
-            startTime: new Date().toISOString()
-        });
-
-        child.stdout.on('data', (chunk) => {
-            const text = chunk.toString();
-            broadcaster.broadcast('log', { text, stream: 'stdout', projectId, orgId, runId });
-        });
-
-        child.stderr.on('data', (chunk) => {
-            const text = chunk.toString();
-            broadcaster.broadcast('log', { text, stream: 'stderr', projectId, orgId, runId });
-        });
-
-        child.on('close', async (code) => {
-            activeProjectProcesses.delete(projectId);
-
-            // Copy generated artifacts to latest directory for instant static viewing
-            try {
-                const files = fs.readdirSync(runDir);
-                for (const file of files) {
-                    const src = path.join(runDir, file);
-                    const dest = path.join(latestDir, file);
-                    if (fs.lstatSync(src).isDirectory()) {
-                        fs.cpSync(src, dest, { recursive: true });
-                    } else {
-                        fs.copyFileSync(src, dest);
-                    }
-                }
-            } catch (copyErr) {
-                console.warn(`[tenant-run] Failed copying to latest: ${copyErr.message}`);
-            }
-
-            // Parse and save run to PostgreSQL
-            try {
-                const summaryFile = path.join(runDir, 'k6-summary.json');
-                if (fs.existsSync(summaryFile)) {
-                    const summary = JSON.parse(fs.readFileSync(summaryFile, 'utf8'));
-                    const getM = (name) => {
-                        const m = summary.metrics?.[name];
-                        if (!m) return {};
-                        return m.values ? { ...m, ...m.values } : m;
-                    };
-                    const dur = getM("http_req_duration");
-                    const reqs = getM("http_reqs");
-                    const failed = getM("http_req_failed");
-                    const failedRate = failed.value !== undefined ? failed.value : (failed.rate !== undefined ? failed.rate : (failed.passes && (failed.passes + (failed.fails || 0)) > 0 ? (failed.passes / (failed.passes + (failed.fails || 0))) : 0));
-                    const totalReqs = reqs.count || 0;
-                    const failedReqs = failed.passes !== undefined ? failed.passes : Math.round(totalReqs * failedRate);
-                    const errRate = Number((failedRate * 100).toFixed(2));
-                    const vus = getM("vus_max");
-                    const peakVus = vus.value || stages[0]?.target || 10;
-                    const throughput = Number((reqs.rate || 0).toFixed(2));
-                    const p95 = Number((dur["p(95)"] || 0).toFixed(2));
-                    const p99 = Number((dur["p(99)"] || 0).toFixed(2));
-                    const avg = Number((dur.avg || 0).toFixed(2));
-                    const med = Number((dur.med || 0).toFixed(2));
-                    const max = Number((dur.max || 0).toFixed(2));
-
-                    // Timeseries
-                    const timeseries = [];
-                    for (let s = 1; s <= testDurationSec; s++) {
-                        const progress = s / testDurationSec;
-                        let vuCur = peakVus;
-                        if (progress < 0.2) vuCur = Math.round(peakVus * (progress / 0.2));
-                        else if (progress > 0.8) vuCur = Math.round(peakVus * (1 - ((progress - 0.8) / 0.2)));
-                        timeseries.push({
-                            second_offset: s,
-                            active_vus: Math.max(1, vuCur),
-                            throughput_rps: Number((throughput * (0.85 + Math.random() * 0.3)).toFixed(1)),
-                            p95_latency_ms: Number((p95 * (0.88 + Math.random() * 0.24)).toFixed(1)),
-                            errors_per_second: errRate > 0 ? 0.5 : 0
-                        });
-                    }
-
-                    await runRepository.saveRun({
-                        id: runId,
-                        org_id: orgId,
-                        project_id: projectId,
-                        environment_id: targetEnv.id || null,
-                        triggered_by: req.user ? req.user.id : null,
-                        build_label: isolatedConfig.run.buildLabel,
-                        environment: targetEnv.name || "staging",
-                        target_base_url: targetEnv.base_url,
-                        spec_title: activeSpec.name,
-                        spec_version: activeSpec.version,
-                        spec_format: activeSpec.format,
-                        started_at: new Date(Date.now() - testDurationSec * 1000),
-                        finished_at: new Date(),
-                        duration_seconds: testDurationSec,
-                        exit_code: code,
-                        passed: code === 0,
-                        sla_verdict: code === 0 ? "PASSED" : "FAILED",
-                        peak_vus: peakVus,
-                        total_requests: totalReqs,
-                        failed_requests: failedReqs,
-                        error_rate: errRate,
-                        throughput_rps: throughput,
-                        p95_latency_ms: p95,
-                        p99_latency_ms: p99,
-                        avg_latency_ms: avg,
-                        med_latency_ms: med,
-                        max_latency_ms: max,
-                        config_snapshot: isolatedConfig,
-                        timeseries
-                    });
-                    console.log(`[tenant-run] Scoped test run ${runId} saved for project ${req.project.name} (${projectId})`);
-                }
-            } catch (saveErr) {
-                console.error(`[tenant-run] Error saving run to DB: ${saveErr.message}`);
-            }
-
-            broadcaster.broadcast('pipeline_finished', {
-                projectId,
-                orgId,
-                runId,
-                exitCode: code,
-                finishedAt: new Date().toISOString()
-            });
+        const result = await startProjectPipeline({
+            projectId: req.project.id,
+            orgId: req.project.org_id,
+            environmentName: req.body.environment || req.body.envName || 'staging',
+            baseUrl: req.body.baseUrl,
+            stages: req.body.stages,
+            peakVus: req.body.peakVus,
+            thresholds: req.body.thresholds,
+            p95ThresholdMs: req.body.p95ThresholdMs,
+            maxErrorRate: req.body.maxErrorRate,
+            buildLabel: req.body.buildLabel || 'v1.0.0',
+            triggeredBy: req.user.id
         });
 
         res.status(202).json({
             success: true,
             message: `Scoped load test pipeline started for project '${req.project.name}'`,
-            runId,
-            environment: targetEnv.name,
-            outputDirectory: path.relative(ROOT_DIR, runDir)
+            runId: result.runId,
+            environment: result.targetEnvironment,
+            outputDirectory: path.relative(ROOT_DIR, result.outputDirectory)
         });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to start scoped pipeline: ' + err.message });
+        if (err.message && err.message.includes('already running')) {
+            return res.status(409).json({ error: err.message });
+        }
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// ==========================================
+// SCHEDULES (Automated Cron Benchmarks)
+// ==========================================
+
+// GET /api/projects/:projectId/schedules
+router.get('/:projectId/schedules', requireProjectRole(['admin', 'developer', 'viewer']), async (req, res) => {
+    try {
+        const schRes = await query(
+            `SELECT s.*, e.name as environment_name, u.full_name as creator_name
+             FROM project_schedules s
+             LEFT JOIN project_environments e ON s.environment_id = e.id
+             LEFT JOIN users u ON s.created_by = u.id
+             WHERE s.project_id = $1
+             ORDER BY s.created_at DESC`,
+            [req.project.id]
+        );
+        res.json(schRes.rows);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed fetching schedules: ' + err.message });
+    }
+});
+
+// POST /api/projects/:projectId/schedules
+router.post('/:projectId/schedules', requireProjectRole(['admin', 'developer']), async (req, res) => {
+    try {
+        const { name, cronExpression, environmentId, peakVus, durationSec, p95ThresholdMs, maxErrorRatePct } = req.body;
+        if (!name || !cronExpression) {
+            return res.status(400).json({ error: 'Name and cronExpression are required.' });
+        }
+
+        const cron = require('node-cron');
+        if (!cron.validate(cronExpression.trim())) {
+            return res.status(400).json({ error: `Invalid cron expression '${cronExpression}'. Example: '0 2 * * *' (Every day at 2 AM)` });
+        }
+
+        const insRes = await query(
+            `INSERT INTO project_schedules 
+             (project_id, environment_id, name, cron_expression, is_active, peak_vus, duration_sec, p95_threshold_ms, max_error_rate_pct, created_by)
+             VALUES ($1, $2, $3, $4, TRUE, $5, $6, $7, $8, $9)
+             RETURNING *`,
+            [
+                req.project.id,
+                environmentId || null,
+                name.trim(),
+                cronExpression.trim(),
+                peakVus ? parseInt(peakVus, 10) : 20,
+                durationSec ? parseInt(durationSec, 10) : 10,
+                p95ThresholdMs ? parseInt(p95ThresholdMs, 10) : 500,
+                maxErrorRatePct !== undefined ? parseFloat(maxErrorRatePct) : 1.0,
+                req.user.id
+            ]
+        );
+        const newSchedule = insRes.rows[0];
+        registerSchedule(newSchedule);
+
+        res.status(201).json({ success: true, schedule: newSchedule });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed creating schedule: ' + err.message });
+    }
+});
+
+// PUT /api/projects/:projectId/schedules/:scheduleId
+router.put('/:projectId/schedules/:scheduleId', requireProjectRole(['admin', 'developer']), async (req, res) => {
+    try {
+        const { scheduleId } = req.params;
+        const { name, cronExpression, environmentId, peakVus, durationSec, p95ThresholdMs, maxErrorRatePct, isActive } = req.body;
+
+        const curRes = await query('SELECT * FROM project_schedules WHERE id = $1 AND project_id = $2', [scheduleId, req.project.id]);
+        if (curRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Schedule not found.' });
+        }
+        const current = curRes.rows[0];
+
+        const updatedCron = cronExpression !== undefined ? cronExpression.trim() : current.cron_expression;
+        const cron = require('node-cron');
+        if (cronExpression !== undefined && !cron.validate(updatedCron)) {
+            return res.status(400).json({ error: `Invalid cron expression '${updatedCron}'` });
+        }
+
+        const updatedActive = isActive !== undefined ? !!isActive : current.is_active;
+
+        const updRes = await query(
+            `UPDATE project_schedules
+             SET name = COALESCE($1, name),
+                 cron_expression = $2,
+                 environment_id = COALESCE($3, environment_id),
+                 peak_vus = COALESCE($4, peak_vus),
+                 duration_sec = COALESCE($5, duration_sec),
+                 p95_threshold_ms = COALESCE($6, p95_threshold_ms),
+                 max_error_rate_pct = COALESCE($7, max_error_rate_pct),
+                 is_active = $8,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $9 AND project_id = $10
+             RETURNING *`,
+            [
+                name ? name.trim() : null,
+                updatedCron,
+                environmentId || null,
+                peakVus ? parseInt(peakVus, 10) : null,
+                durationSec ? parseInt(durationSec, 10) : null,
+                p95ThresholdMs ? parseInt(p95ThresholdMs, 10) : null,
+                maxErrorRatePct !== undefined ? parseFloat(maxErrorRatePct) : null,
+                updatedActive,
+                scheduleId,
+                req.project.id
+            ]
+        );
+
+        const updated = updRes.rows[0];
+        if (updated.is_active) {
+            registerSchedule(updated);
+        } else {
+            unregisterSchedule(updated.id);
+        }
+
+        res.json({ success: true, schedule: updated });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed updating schedule: ' + err.message });
+    }
+});
+
+// DELETE /api/projects/:projectId/schedules/:scheduleId
+router.delete('/:projectId/schedules/:scheduleId', requireProjectRole(['admin', 'developer']), async (req, res) => {
+    try {
+        const { scheduleId } = req.params;
+        unregisterSchedule(scheduleId);
+        await query('DELETE FROM project_schedules WHERE id = $1 AND project_id = $2', [scheduleId, req.project.id]);
+        res.json({ success: true, message: 'Schedule removed.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed deleting schedule: ' + err.message });
+    }
+});
+
+// POST /api/projects/:projectId/schedules/:scheduleId/trigger
+router.post('/:projectId/schedules/:scheduleId/trigger', requireProjectRole(['admin', 'developer']), async (req, res) => {
+    try {
+        const { scheduleId } = req.params;
+        const curRes = await query('SELECT * FROM project_schedules WHERE id = $1 AND project_id = $2', [scheduleId, req.project.id]);
+        if (curRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Schedule not found.' });
+        }
+        if (isProjectPipelineRunning(req.project.id)) {
+            return res.status(409).json({ error: 'A performance pipeline is already running for this project.' });
+        }
+
+        // Trigger asynchronously
+        executeScheduledRun(scheduleId);
+        res.json({ success: true, message: `Scheduled benchmark '${curRes.rows[0].name}' triggered successfully.` });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed triggering schedule: ' + err.message });
+    }
+});
+
+// ==========================================
+// WEBHOOKS (Alerts & Notifications)
+// ==========================================
+
+// GET /api/projects/:projectId/webhooks
+router.get('/:projectId/webhooks', requireProjectRole(['admin', 'developer', 'viewer']), async (req, res) => {
+    try {
+        const whRes = await query(
+            'SELECT id, project_id, name, url, events, is_active, last_dispatched_at, last_status_code, created_at FROM project_webhooks WHERE project_id = $1 ORDER BY created_at DESC',
+            [req.project.id]
+        );
+        res.json(whRes.rows);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed fetching webhooks: ' + err.message });
+    }
+});
+
+// POST /api/projects/:projectId/webhooks
+router.post('/:projectId/webhooks', requireProjectRole(['admin']), async (req, res) => {
+    try {
+        const { name, url, events, secret } = req.body;
+        if (!url) {
+            return res.status(400).json({ error: 'Webhook URL is required.' });
+        }
+        try {
+            new URL(url);
+        } catch (_) {
+            return res.status(400).json({ error: 'Invalid URL format.' });
+        }
+
+        const eventsArray = Array.isArray(events) && events.length > 0 ? events : ['run.completed', 'sla.failed'];
+
+        const insRes = await query(
+            `INSERT INTO project_webhooks (project_id, name, url, events, secret, is_active)
+             VALUES ($1, $2, $3, $4, $5, TRUE)
+             RETURNING id, project_id, name, url, events, is_active, created_at`,
+            [req.project.id, name ? name.trim() : 'Webhook Alert', url.trim(), JSON.stringify(eventsArray), secret ? secret.trim() : null]
+        );
+
+        res.status(201).json({ success: true, webhook: insRes.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed creating webhook: ' + err.message });
+    }
+});
+
+// DELETE /api/projects/:projectId/webhooks/:webhookId
+router.delete('/:projectId/webhooks/:webhookId', requireProjectRole(['admin']), async (req, res) => {
+    try {
+        const { webhookId } = req.params;
+        await query('DELETE FROM project_webhooks WHERE id = $1 AND project_id = $2', [webhookId, req.project.id]);
+        res.json({ success: true, message: 'Webhook removed.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed deleting webhook: ' + err.message });
+    }
+});
+
+// POST /api/projects/:projectId/webhooks/test
+router.post('/:projectId/webhooks/test', requireProjectRole(['admin', 'developer']), async (req, res) => {
+    try {
+        const { url, secret } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL is required.' });
+        const { testWebhookPing } = require('../notifications/webhook-dispatcher');
+        const outcome = await testWebhookPing(url, secret);
+        res.json(outcome);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed testing webhook: ' + err.message });
     }
 });
 

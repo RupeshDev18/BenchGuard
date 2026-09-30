@@ -83,6 +83,9 @@
       </div>
 
       <div class="workspace-nav-right">
+        <button id="openSchedulesBtn" class="btn btn-sm btn-dark" type="button" title="Automated Cron Benchmarks & Alert Webhooks">
+          ⏰ Schedules & Alerts
+        </button>
         <button id="openTeamBtn" class="btn btn-sm btn-dark" type="button" title="Manage Organization Members & Roles">
           👥 Team
         </button>
@@ -1180,6 +1183,183 @@
       </div>
       <div class="modal-footer">
         <button id="submitCustomLoginBtn" class="btn btn-primary" type="button">Sign In</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       SAAS MODAL 5: AUTOMATED SCHEDULES & ALERT WEBHOOKS
+       ==================================================================== -->
+  <div class="modal-overlay hidden" id="schedulesModal">
+    <div class="modal-card" style="max-width: 840px;">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">⏰ Automated Schedules & Alert Webhooks</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            Project: <strong id="schedulesModalProjectName" style="color: var(--primary);">Loading...</strong>
+          </div>
+        </div>
+        <button id="closeSchedulesModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
+      </div>
+
+      <!-- Schedule Sub Tabs -->
+      <div style="display: flex; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--border); background-color: var(--card-bg-subtle);">
+        <button id="schSubTabSchedules" class="btn btn-sm btn-primary" type="button">📅 Recurring Benchmarks</button>
+        <button id="schSubTabWebhooks" class="btn btn-sm btn-dark" type="button">🔔 Webhook Alerts (Slack / Teams / APM)</button>
+      </div>
+
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        <!-- Panel 1: Schedules -->
+        <div id="schPanelSchedules">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="font-size: 13px; font-weight: 700;">Active Cron Schedules</div>
+            <span style="font-size: 11px; color: var(--text-muted);">Runs autonomously in background</span>
+          </div>
+
+          <table class="table" style="width: 100%; margin-bottom: 18px;">
+            <thead>
+              <tr>
+                <th>Schedule Name</th>
+                <th>Cron Interval</th>
+                <th>Environment</th>
+                <th>Target Load</th>
+                <th>Last Status</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="schedulesTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+
+          <div style="background-color: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px;">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">+ Create New Automated Benchmark Schedule</div>
+            
+            <div class="grid grid-2" style="gap: 12px;">
+              <div class="input-group">
+                <label for="newSchName">Schedule Name</label>
+                <input type="text" id="newSchName" placeholder="e.g. Nightly 2 AM Regression" />
+              </div>
+              <div class="input-group">
+                <label for="newSchPreset">Frequency Preset</label>
+                <select id="newSchPreset">
+                  <option value="0 2 * * *">Nightly at 2:00 AM (0 2 * * *)</option>
+                  <option value="0 */6 * * *">Every 6 Hours (0 */6 * * *)</option>
+                  <option value="0 * * * *">Every 1 Hour (0 * * * *)</option>
+                  <option value="0 0 * * 0">Weekly Sunday Midnight (0 0 * * 0)</option>
+                  <option value="custom">Custom Cron Expression</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap: 12px; margin-top: 8px;">
+              <div class="input-group">
+                <label for="newSchCron">Cron Expression</label>
+                <input type="text" id="newSchCron" value="0 2 * * *" style="font-family: var(--font-mono);" />
+              </div>
+              <div class="input-group">
+                <label for="newSchEnv">Target Environment</label>
+                <select id="newSchEnv">
+                  <option value="staging">Staging</option>
+                  <option value="production">Production</option>
+                  <option value="dev">Development</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-4" style="gap: 8px; margin-top: 8px;">
+              <div class="input-group">
+                <label for="newSchVus">Peak VUs</label>
+                <input type="number" id="newSchVus" value="20" min="1" max="500" />
+              </div>
+              <div class="input-group">
+                <label for="newSchDuration">Duration (s)</label>
+                <input type="number" id="newSchDuration" value="15" min="5" max="300" />
+              </div>
+              <div class="input-group">
+                <label for="newSchP95">SLA p95 (ms)</label>
+                <input type="number" id="newSchP95" value="500" min="50" max="10000" />
+              </div>
+              <div class="input-group">
+                <label for="newSchErrorRate">Max Error (%)</label>
+                <input type="number" id="newSchErrorRate" value="1.0" step="0.1" min="0" max="100" />
+              </div>
+            </div>
+
+            <button id="submitCreateScheduleBtn" class="btn btn-primary btn-sm" style="margin-top: 12px;" type="button">
+              + Save Benchmark Schedule
+            </button>
+          </div>
+        </div>
+
+        <!-- Panel 2: Webhooks -->
+        <div id="schPanelWebhooks" class="hidden">
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px;">
+            Send rich real-time alerts to Slack channels, Microsoft Teams, Discord, or generic APM HTTP webhooks whenever performance benchmarks finish or SLAs breach thresholds.
+          </div>
+
+          <table class="table" style="width: 100%; margin-bottom: 18px;">
+            <thead>
+              <tr>
+                <th>Webhook Name</th>
+                <th>Target URL</th>
+                <th>Subscribed Events</th>
+                <th>Last Dispatched</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="webhooksTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+
+          <div style="background-color: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px;">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">+ Register Notification Webhook</div>
+            
+            <div class="grid grid-2" style="gap: 12px;">
+              <div class="input-group">
+                <label for="newWebhookName">Webhook Name</label>
+                <input type="text" id="newWebhookName" placeholder="e.g. #dev-alerts Slack" />
+              </div>
+              <div class="input-group">
+                <label for="newWebhookUrl">Target Webhook URL</label>
+                <input type="url" id="newWebhookUrl" placeholder="https://hooks.slack.com/services/... or https://api.mycompany.com/webhook" />
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap: 12px; margin-top: 8px;">
+              <div class="input-group">
+                <label>Subscribed Events</label>
+                <div style="display: flex; gap: 14px; margin-top: 6px;">
+                  <label style="font-weight: normal; cursor: pointer; font-size: 12px;">
+                    <input type="checkbox" id="whEventCompleted" checked /> Benchmark Completed
+                  </label>
+                  <label style="font-weight: normal; cursor: pointer; font-size: 12px;">
+                    <input type="checkbox" id="whEventFailed" checked /> SLA Threshold Failed
+                  </label>
+                </div>
+              </div>
+              <div class="input-group">
+                <label for="newWebhookSecret">HMAC Secret Key (Optional)</label>
+                <input type="text" id="newWebhookSecret" placeholder="Optional secret for SHA256 signature verification" />
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+              <button id="testWebhookBtn" class="btn btn-secondary btn-sm" type="button">
+                🧪 Send Test Ping
+              </button>
+              <button id="submitCreateWebhookBtn" class="btn btn-primary btn-sm" type="button">
+                + Save Webhook
+              </button>
+            </div>
+            <div id="testWebhookFeedback" style="margin-top: 8px; font-size: 11px; font-family: var(--font-mono);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="closeSchedulesModalFooterBtn" class="btn btn-dark" type="button">Done</button>
       </div>
     </div>
   </div>

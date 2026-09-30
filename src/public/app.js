@@ -2493,6 +2493,9 @@ function initSaasModals() {
       }
     });
   });
+
+  // 6. Schedules & Webhooks Modal
+  initSchedulesAndWebhooksUI();
 }
 
 async function loadAvailableTemplates() {
@@ -2600,4 +2603,434 @@ async function loadTeamMembers() {
     console.error("Team members fetch error:", err);
   }
 }
+
+// ============================================================================
+// SAAS CONTROLLER: AUTOMATED BENCHMARK SCHEDULES & ALERT WEBHOOKS
+// ============================================================================
+
+function initSchedulesAndWebhooksUI() {
+  const openBtn = document.getElementById("openSchedulesBtn");
+  const modal = document.getElementById("schedulesModal");
+  const closeBtn = document.getElementById("closeSchedulesModalBtn");
+  const closeFooterBtn = document.getElementById("closeSchedulesModalFooterBtn");
+
+  const tabSchedules = document.getElementById("schSubTabSchedules");
+  const tabWebhooks = document.getElementById("schSubTabWebhooks");
+  const panelSchedules = document.getElementById("schPanelSchedules");
+  const panelWebhooks = document.getElementById("schPanelWebhooks");
+
+  const presetSelect = document.getElementById("newSchPreset");
+  const cronInput = document.getElementById("newSchCron");
+  const submitScheduleBtn = document.getElementById("submitCreateScheduleBtn");
+
+  const submitWebhookBtn = document.getElementById("submitCreateWebhookBtn");
+  const testWebhookBtn = document.getElementById("testWebhookBtn");
+
+  if (!openBtn || !modal) return;
+
+  openBtn.addEventListener("click", () => {
+    openModal("schedulesModal");
+    const projNameEl = document.getElementById("schedulesModalProjectName");
+    if (projNameEl) {
+      projNameEl.textContent = authState.currentProject ? authState.currentProject.name : "No Project Selected";
+    }
+    loadSchedules();
+    loadWebhooks();
+  });
+
+  if (closeBtn) closeBtn.addEventListener("click", () => closeModal("schedulesModal"));
+  if (closeFooterBtn) closeFooterBtn.addEventListener("click", () => closeModal("schedulesModal"));
+
+  // Tab switching
+  if (tabSchedules && tabWebhooks && panelSchedules && panelWebhooks) {
+    tabSchedules.addEventListener("click", () => {
+      tabSchedules.className = "btn btn-sm btn-primary";
+      tabWebhooks.className = "btn btn-sm btn-dark";
+      panelSchedules.classList.remove("hidden");
+      panelWebhooks.classList.add("hidden");
+    });
+
+    tabWebhooks.addEventListener("click", () => {
+      tabWebhooks.className = "btn btn-sm btn-primary";
+      tabSchedules.className = "btn btn-sm btn-dark";
+      panelWebhooks.classList.remove("hidden");
+      panelSchedules.classList.add("hidden");
+    });
+  }
+
+  // Frequency preset change
+  if (presetSelect && cronInput) {
+    presetSelect.addEventListener("change", () => {
+      if (presetSelect.value !== "custom") {
+        cronInput.value = presetSelect.value;
+      }
+    });
+  }
+
+  // Create schedule
+  if (submitScheduleBtn) {
+    submitScheduleBtn.addEventListener("click", async () => {
+      if (!authState.currentProject) {
+        showToast("Please select a project first", "error");
+        return;
+      }
+      const name = document.getElementById("newSchName").value.trim();
+      const cronExpr = document.getElementById("newSchCron").value.trim();
+      const envName = document.getElementById("newSchEnv").value;
+      const vus = parseInt(document.getElementById("newSchVus").value, 10);
+      const duration = parseInt(document.getElementById("newSchDuration").value, 10);
+      const p95 = parseInt(document.getElementById("newSchP95").value, 10);
+      const errorRate = parseFloat(document.getElementById("newSchErrorRate").value);
+
+      if (!name) {
+        showToast("Schedule name is required", "error");
+        return;
+      }
+
+      submitScheduleBtn.disabled = true;
+      submitScheduleBtn.textContent = "Saving...";
+
+      try {
+        const res = await fetch(`/api/projects/${authState.currentProject.id}/schedules`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name,
+            cronExpression: cronExpr,
+            peakVus: vus,
+            durationSec: duration,
+            p95ThresholdMs: p95,
+            maxErrorRatePct: errorRate
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Schedule '${name}' created!`, "success");
+          document.getElementById("newSchName").value = "";
+          loadSchedules();
+        } else {
+          showToast(data.error || "Failed creating schedule", "error");
+        }
+      } catch (err) {
+        showToast("Network error creating schedule", "error");
+      } finally {
+        submitScheduleBtn.disabled = false;
+        submitScheduleBtn.textContent = "+ Save Benchmark Schedule";
+      }
+    });
+  }
+
+  // Create webhook
+  if (submitWebhookBtn) {
+    submitWebhookBtn.addEventListener("click", async () => {
+      if (!authState.currentProject) {
+        showToast("Please select a project first", "error");
+        return;
+      }
+      const name = document.getElementById("newWebhookName").value.trim();
+      const url = document.getElementById("newWebhookUrl").value.trim();
+      const secret = document.getElementById("newWebhookSecret").value.trim();
+      const evCompleted = document.getElementById("whEventCompleted").checked;
+      const evFailed = document.getElementById("whEventFailed").checked;
+
+      const events = [];
+      if (evCompleted) events.push("run.completed");
+      if (evFailed) events.push("sla.failed");
+
+      if (!url) {
+        showToast("Webhook URL is required", "error");
+        return;
+      }
+
+      submitWebhookBtn.disabled = true;
+      submitWebhookBtn.textContent = "Saving...";
+
+      try {
+        const res = await fetch(`/api/projects/${authState.currentProject.id}/webhooks`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ name, url, secret: secret || null, events })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast("Webhook registered successfully!", "success");
+          document.getElementById("newWebhookName").value = "";
+          document.getElementById("newWebhookUrl").value = "";
+          document.getElementById("newWebhookSecret").value = "";
+          loadWebhooks();
+        } else {
+          showToast(data.error || "Failed saving webhook", "error");
+        }
+      } catch (err) {
+        showToast("Network error saving webhook", "error");
+      } finally {
+        submitWebhookBtn.disabled = false;
+        submitWebhookBtn.textContent = "+ Save Webhook";
+      }
+    });
+  }
+
+  // Test webhook ping
+  if (testWebhookBtn) {
+    testWebhookBtn.addEventListener("click", async () => {
+      const url = document.getElementById("newWebhookUrl").value.trim();
+      const secret = document.getElementById("newWebhookSecret").value.trim();
+      const fb = document.getElementById("testWebhookFeedback");
+
+      if (!url) {
+        showToast("Please enter a webhook URL to test", "error");
+        return;
+      }
+
+      fb.textContent = "Sending test ping...";
+      fb.style.color = "var(--text-muted)";
+
+      try {
+        const res = await fetch(`/api/projects/${authState.currentProject ? authState.currentProject.id : 'default'}/webhooks/test`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ url, secret: secret || null })
+        });
+        const data = await res.json();
+        if (data.success) {
+          fb.textContent = `✅ Ping delivered successfully! HTTP ${data.statusCode}`;
+          fb.style.color = "var(--success)";
+        } else {
+          fb.textContent = `❌ Ping failed (HTTP ${data.statusCode}): ${data.error || data.body || 'No response'}`;
+          fb.style.color = "var(--danger)";
+        }
+      } catch (err) {
+        fb.textContent = `❌ Network error: ${err.message}`;
+        fb.style.color = "var(--danger)";
+      }
+    });
+  }
+}
+
+async function loadSchedules() {
+  if (!authState.currentProject) return;
+  const tbody = document.getElementById("schedulesTableBody");
+  if (!tbody) return;
+
+  try {
+    const res = await fetch(`/api/projects/${authState.currentProject.id}/schedules`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 14px;">Unable to fetch schedules.</td></tr>`;
+      return;
+    }
+    const schedules = await res.json();
+    tbody.innerHTML = "";
+
+    if (schedules.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 14px;">No recurring schedules configured for this project yet.</td></tr>`;
+      return;
+    }
+
+    schedules.forEach(s => {
+      const tr = document.createElement("tr");
+      const statusClass = s.last_run_status === 'passed' ? 'status-pass' : (s.last_run_status === 'failed' ? 'status-fail' : (s.last_run_status === 'running' ? 'status-running' : 'status-pending'));
+      const activeBadge = s.is_active
+        ? `<span class="badge" style="background-color: rgba(40,167,69,0.15); color: #28a745; font-size: 11px;">Active</span>`
+        : `<span class="badge" style="background-color: rgba(108,117,125,0.15); color: #6c757d; font-size: 11px;">Paused</span>`;
+
+      tr.innerHTML = `
+        <td>
+          <div style="font-weight: 600; color: var(--text);">${escapeHtml(s.name)}</div>
+          <div style="margin-top: 2px;">${activeBadge}</div>
+        </td>
+        <td>
+          <span style="font-family: var(--font-mono); font-size: 12px; background-color: var(--card-bg-subtle); padding: 2px 6px; border-radius: 3px; border: 1px solid var(--border);">
+            ${escapeHtml(s.cron_expression)}
+          </span>
+        </td>
+        <td style="font-size: 12px; color: var(--text-muted);">${escapeHtml(s.environment_name || 'staging')}</td>
+        <td style="font-size: 12px; font-family: var(--font-mono);">${s.peak_vus || 20} VUs / ${s.duration_sec || 10}s</td>
+        <td>
+          <span class="badge ${statusClass}" style="font-size: 10px; text-transform: uppercase;">
+            ${escapeHtml(s.last_run_status || 'never')}
+          </span>
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+            ${s.last_run_at ? new Date(s.last_run_at).toLocaleTimeString() : 'No runs yet'}
+          </div>
+        </td>
+        <td style="text-align: right; white-space: nowrap;">
+          <button class="btn btn-sm btn-secondary sch-run-btn" data-id="${s.id}" title="Run Now" style="padding: 3px 8px; font-size: 11px;">
+            ▶ Run
+          </button>
+          <button class="btn btn-sm btn-dark sch-toggle-btn" data-id="${s.id}" data-active="${s.is_active}" title="${s.is_active ? 'Pause Schedule' : 'Enable Schedule'}" style="padding: 3px 8px; font-size: 11px;">
+            ${s.is_active ? '⏸ Pause' : '▶ Enable'}
+          </button>
+          <button class="btn btn-sm btn-danger sch-del-btn" data-id="${s.id}" title="Delete Schedule" style="padding: 3px 8px; font-size: 11px;">
+            ✕
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Wire up row buttons
+    tbody.querySelectorAll(".sch-run-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        btn.disabled = true;
+        btn.textContent = "Triggering...";
+        try {
+          const res = await fetch(`/api/projects/${authState.currentProject.id}/schedules/${id}/trigger`, {
+            method: "POST",
+            headers: getAuthHeaders()
+          });
+          const d = await res.json();
+          if (res.ok) {
+            showToast("Benchmark triggered in background!", "success");
+            loadSchedules();
+          } else {
+            showToast(d.error || "Failed triggering schedule", "error");
+          }
+        } catch (_) {
+          showToast("Network error", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "▶ Run";
+        }
+      });
+    });
+
+    tbody.querySelectorAll(".sch-toggle-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        const isCurrentActive = btn.getAttribute("data-active") === "true";
+        try {
+          const res = await fetch(`/api/projects/${authState.currentProject.id}/schedules/${id}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ isActive: !isCurrentActive })
+          });
+          if (res.ok) {
+            showToast(!isCurrentActive ? "Schedule enabled!" : "Schedule paused", "info");
+            loadSchedules();
+          }
+        } catch (_) {
+          showToast("Failed updating schedule", "error");
+        }
+      });
+    });
+
+    tbody.querySelectorAll(".sch-del-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this automated benchmark schedule?")) return;
+        const id = btn.getAttribute("data-id");
+        try {
+          const res = await fetch(`/api/projects/${authState.currentProject.id}/schedules/${id}`, {
+            method: "DELETE",
+            headers: getAuthHeaders()
+          });
+          if (res.ok) {
+            showToast("Schedule removed", "info");
+            loadSchedules();
+          }
+        } catch (_) {
+          showToast("Failed deleting schedule", "error");
+        }
+      });
+    });
+
+  } catch (err) {
+    console.error("loadSchedules error:", err);
+  }
+}
+
+async function loadWebhooks() {
+  if (!authState.currentProject) return;
+  const tbody = document.getElementById("webhooksTableBody");
+  if (!tbody) return;
+
+  try {
+    const res = await fetch(`/api/projects/${authState.currentProject.id}/webhooks`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 14px;">Unable to fetch webhooks.</td></tr>`;
+      return;
+    }
+    const webhooks = await res.json();
+    tbody.innerHTML = "";
+
+    if (webhooks.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 14px;">No alert webhooks configured yet.</td></tr>`;
+      return;
+    }
+
+    webhooks.forEach(wh => {
+      const tr = document.createElement("tr");
+      let eventsArr = [];
+      try {
+        eventsArr = typeof wh.events === "string" ? JSON.parse(wh.events) : wh.events;
+      } catch (_) {
+        eventsArr = ["run.completed"];
+      }
+
+      const eventsPills = eventsArr.map(e => `
+        <span style="font-size: 10px; background-color: var(--card-bg-subtle); border: 1px solid var(--border); padding: 1px 5px; border-radius: 3px; font-family: var(--font-mono);">
+          ${escapeHtml(e)}
+        </span>
+      `).join(" ");
+
+      const statusBadge = wh.last_status_code
+        ? (wh.last_status_code >= 200 && wh.last_status_code < 300
+            ? `<span class="badge" style="background-color: rgba(40,167,69,0.15); color: #28a745; font-size: 11px;">HTTP ${wh.last_status_code}</span>`
+            : `<span class="badge" style="background-color: rgba(220,53,69,0.15); color: #dc3545; font-size: 11px;">HTTP ${wh.last_status_code}</span>`)
+        : `<span style="font-size: 11px; color: var(--text-muted);">Not dispatched yet</span>`;
+
+      tr.innerHTML = `
+        <td style="font-weight: 600; color: var(--text);">${escapeHtml(wh.name)}</td>
+        <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          ${escapeHtml(wh.url)}
+        </td>
+        <td>${eventsPills}</td>
+        <td>
+          ${statusBadge}
+          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+            ${wh.last_dispatched_at ? new Date(wh.last_dispatched_at).toLocaleTimeString() : ''}
+          </div>
+        </td>
+        <td style="text-align: right;">
+          <button class="btn btn-sm btn-danger wh-del-btn" data-id="${wh.id}" title="Remove Webhook" style="padding: 3px 8px; font-size: 11px;">
+            ✕ Remove
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll(".wh-del-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Remove this alert webhook?")) return;
+        const id = btn.getAttribute("data-id");
+        try {
+          const res = await fetch(`/api/projects/${authState.currentProject.id}/webhooks/${id}`, {
+            method: "DELETE",
+            headers: getAuthHeaders()
+          });
+          if (res.ok) {
+            showToast("Webhook removed", "info");
+            loadWebhooks();
+          }
+        } catch (_) {
+          showToast("Failed removing webhook", "error");
+        }
+      });
+    });
+
+  } catch (err) {
+    console.error("loadWebhooks error:", err);
+  }
+}
+
+// Call initialization at DOM ready
+document.addEventListener("DOMContentLoaded", () => {
+  initSchedulesAndWebhooksUI();
+});
+
 

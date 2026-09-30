@@ -9,7 +9,7 @@ async function saveRun(runData) {
     try {
         await client.query('BEGIN');
 
-        const runId = runData.id || randomUUID();
+        const runId = runData.id || runData.run_id || runData.runId || randomUUID();
         const buildLabel = runData.build_label || runData.buildLabel || 'v1.0.0';
         const environment = runData.environment || 'staging';
         const targetBaseUrl = runData.target_base_url || runData.targetBaseUrl || 'http://localhost:8080';

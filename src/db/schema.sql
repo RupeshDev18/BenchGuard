@@ -184,3 +184,42 @@ CREATE INDEX IF NOT EXISTS idx_test_runs_created_at ON test_runs(created_at DESC
 CREATE INDEX IF NOT EXISTS idx_endpoint_metrics_run_id ON endpoint_run_metrics(run_id);
 CREATE INDEX IF NOT EXISTS idx_run_timeseries_run_sec ON run_timeseries(run_id, second_offset);
 CREATE INDEX IF NOT EXISTS idx_contract_results_run_id ON contract_test_results(run_id);
+
+-- 13. Scheduled Automated Benchmarks (Recurring Cron Jobs per project)
+CREATE TABLE IF NOT EXISTS project_schedules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    environment_id UUID REFERENCES project_environments(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL,
+    cron_expression VARCHAR(64) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    peak_vus INT NOT NULL DEFAULT 20,
+    duration_sec INT NOT NULL DEFAULT 10,
+    p95_threshold_ms INT NOT NULL DEFAULT 500,
+    max_error_rate_pct NUMERIC(5,2) NOT NULL DEFAULT 1.0,
+    last_run_at TIMESTAMPTZ,
+    next_run_at TIMESTAMPTZ,
+    last_run_status VARCHAR(32) DEFAULT 'pending',
+    last_run_id UUID REFERENCES test_runs(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 14. Project Webhooks (Alerting for Slack, Teams, Discord, custom APM)
+CREATE TABLE IF NOT EXISTS project_webhooks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL DEFAULT 'Webhook Alert',
+    url VARCHAR(1024) NOT NULL,
+    events JSONB NOT NULL DEFAULT '["run.completed", "sla.failed"]'::jsonb,
+    secret VARCHAR(255),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_dispatched_at TIMESTAMPTZ,
+    last_status_code INT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_schedules_project ON project_schedules(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_schedules_active ON project_schedules(is_active);
+CREATE INDEX IF NOT EXISTS idx_project_webhooks_project ON project_webhooks(project_id);

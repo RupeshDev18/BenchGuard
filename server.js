@@ -22,6 +22,7 @@ const adminRoutes = require("./src/routes/admin-routes");
 const orgRoutes = require("./src/routes/org-routes");
 const projectRoutes = require("./src/routes/project-routes");
 const broadcaster = require("./src/utils/broadcaster");
+const { initScheduler } = require("./src/scheduler/cron-scheduler");
 
 const app = express();
 const server = http.createServer(app);
@@ -1099,6 +1100,7 @@ server.listen(PORT, async () => {
     const ok = await db.initDatabase();
     if (ok) {
       await seedPastRunsToPostgres();
+      await initScheduler();
     }
   } catch (err) {
     console.warn(`[server] Database startup error:`, err.message);
