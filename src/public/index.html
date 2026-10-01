@@ -105,11 +105,17 @@
     <!-- Navigation Tabs -->
     <nav class="app-nav">
       <div class="nav-container">
-        <button class="tab-btn active" data-tab="demo">
-          ⚡ Demo Sandbox
+        <button class="tab-btn active" data-tab="overview">
+          🏠 Platform Overview
         </button>
         <button class="tab-btn" data-tab="studio">
-          🛠️ Real Test Studio
+          ⚡ Test Studio (Load Testing)
+        </button>
+        <button class="tab-btn" data-tab="schedules">
+          ⏰ Cron Schedules
+        </button>
+        <button class="tab-btn" data-tab="alarms">
+          🚨 Alarms & Webhooks
         </button>
         <button class="tab-btn" data-tab="console">
           🖥️ Live Console
@@ -134,122 +140,256 @@
   <main class="main-content">
 
     <!-- ====================================================================
-         TAB 1: DEMO SANDBOX (Pre-Configured Instant Benchmark)
+         TAB 1: SAAS PLATFORM OVERVIEW & PRODUCT LANDING PAGE
          ==================================================================== -->
-    <section id="tab-demo" class="tab-content active">
-      <div class="demo-hero">
-        <div class="demo-hero-text">
-          <h2>Spring Boot Benchmark Sandbox</h2>
-          <p>
-            Experience the automated k6 and Allure 2 load testing pipeline in action.
-            This sandbox comes pre-configured with a mock Spring Boot API server, full e-commerce OpenAPI 3.0 specification,
-            parameterized user data, and automated contract compliance testing.
+    <section id="tab-overview" class="tab-content active">
+      <div class="landing-container">
+
+        <!-- Hero Banner -->
+        <div class="landing-hero">
+          <div class="landing-pill">
+            <span>✨ Spec-First API Reliability Platform</span>
+            <span>•</span>
+            <span>k6 & OpenTelemetry APM</span>
+          </div>
+          <h1 class="landing-title">
+            Test Your APIs Under Heavy Load,<br />
+            Automate Cron Benchmarks & Stop Failures.
+          </h1>
+          <p class="landing-subtitle">
+            Transform OpenAPI specifications into high-concurrency benchmarks in seconds.
+            Automate continuous performance regression testing with scheduled cron jobs, protect backend microservices with intelligent circuit-breakers, and correlate load bursts down to database spans with distributed APM tracing.
           </p>
+
+          <div class="landing-cta-row">
+            <button class="btn btn-primary btn-lg" type="button" onclick="switchTab('studio')">
+              ⚡ Test Your API Under Load
+            </button>
+            <button class="btn btn-dark btn-lg" type="button" onclick="switchTab('schedules')">
+              ⏰ Setup Cron Benchmark
+            </button>
+            <button class="btn btn-secondary btn-lg" type="button" onclick="switchTab('alarms')">
+              🛑 Configure Failure Alarms
+            </button>
+            <button class="btn btn-secondary btn-lg" type="button" id="landingQuickDemoBtn">
+              ▶️ 1-Click Instant Demo
+            </button>
+          </div>
+
+          <!-- Quick Stats Row -->
+          <div class="landing-stats-row">
+            <div class="landing-stat-item">
+              <div class="landing-stat-value text-primary">10k+ RPS</div>
+              <div class="landing-stat-label">k6 High-Throughput Engine</div>
+            </div>
+            <div class="landing-stat-item">
+              <div class="landing-stat-value text-success">Zero-Touch</div>
+              <div class="landing-stat-label">Automated Cron Benchmarks</div>
+            </div>
+            <div class="landing-stat-item">
+              <div class="landing-stat-value text-danger">Circuit-Breaker</div>
+              <div class="landing-stat-label">Stop on N Failures</div>
+            </div>
+            <div class="landing-stat-item">
+              <div class="landing-stat-value text-warning">W3C OpenTelemetry</div>
+              <div class="landing-stat-label">Distributed APM Waterfall</div>
+            </div>
+            <div class="landing-stat-item">
+              <div class="landing-stat-value">Allure 2</div>
+              <div class="landing-stat-label">Executive SLA Reports</div>
+            </div>
+          </div>
         </div>
+
+        <!-- Product Suite Grid Showcase -->
         <div>
-          <button id="runDemoBenchmarkBtn" class="btn btn-primary btn-lg">
-            ⚡ Run Demo Benchmark (1-Click)
-          </button>
-        </div>
-      </div>
-
-      <div class="demo-grid">
-        <!-- Mock Spring Boot Server Card -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Spring Boot Mock API Server</div>
-            <span class="badge" id="demoMockBadge">Checking...</span>
-          </div>
-          <div class="card-body">
-            <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
-              A built-in mock microservice replicating Spring Boot 3.x REST controllers with JWT security, input validation, and realistic response delays.
+          <div class="product-section-header">
+            <h2 class="product-section-title">Core Products & Capabilities</h2>
+            <p class="product-section-desc">
+              Everything engineering and platform teams need to validate API scalability, reliability, and SLA compliance.
             </p>
+          </div>
 
-            <div class="mock-server-status">
-              <div>
-                <div style="font-weight: 600; color: var(--text); font-size: 13px;" id="demoMockStatusTitle">Mock Server Status</div>
-                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);" id="demoMockStatusUrl">http://localhost:8080</div>
+          <div class="product-grid">
+
+            <!-- Product 1: Test Your API Under Load -->
+            <div class="product-card">
+              <div class="product-card-top">
+                <div class="product-card-header">
+                  <span class="product-icon">⚡</span>
+                  <span class="product-tag product-tag-core">Load Testing</span>
+                </div>
+                <h3 class="product-title">Test Your API Under Loads</h3>
+                <p class="product-desc">
+                  Convert any OpenAPI 3.x or Swagger spec into production-grade k6 scripts. Ramp up virtual users, feed dynamic datasets, and benchmark response times under real-world concurrency.
+                </p>
+                <ul class="product-features-list">
+                  <li>Spec-to-k6 automatic compilation with parameterization</li>
+                  <li>Multi-stage ramps (Smoke, Load, Stress, Soak testing)</li>
+                  <li>Dynamic variable replacement (UUID, timestamps, emails)</li>
+                  <li>Sub-millisecond P90, P95, and P99 latency SLA checks</li>
+                </ul>
               </div>
-              <button id="demoToggleMockBtn" class="btn btn-secondary btn-sm">Start Mock Server</button>
+              <button class="btn btn-primary product-action-btn" type="button" onclick="switchTab('studio')">
+                Launch Test Studio →
+              </button>
             </div>
 
-            <div style="margin-top: 14px;">
-              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
-                Included Demo Endpoints
+            <!-- Product 2: Setup Cron Automated Benchmarks -->
+            <div class="product-card">
+              <div class="product-card-top">
+                <div class="product-card-header">
+                  <span class="product-icon">⏰</span>
+                  <span class="product-tag product-tag-cron">Automation</span>
+                </div>
+                <h3 class="product-title">Setup Cron Benchmarks</h3>
+                <p class="product-desc">
+                  Continuously guard your services against silent performance degradation. Schedule benchmarks hourly, nightly, or on custom cron expressions with zero human intervention.
+                </p>
+                <ul class="product-features-list">
+                  <li>Standard 5-field cron scheduling (e.g. nightly at 2 AM)</li>
+                  <li>Multi-environment execution (Staging, Pre-prod, Production)</li>
+                  <li>Automatic historical trend logging into PostgreSQL</li>
+                  <li>1-click manual trigger and instant pause/resume controls</li>
+                </ul>
               </div>
-              <div style="display: flex; flex-direction: column; gap: 6px;">
-                <div class="endpoint-row" style="padding: 6px 10px;">
-                  <span class="method-badge method-GET">GET</span>
-                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/actuator/health</span>
-                  <span class="badge badge-success">200 OK</span>
-                </div>
-                <div class="endpoint-row" style="padding: 6px 10px;">
-                  <span class="method-badge method-POST">POST</span>
-                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/api/auth/login</span>
-                  <span class="badge badge-primary">JWT Token</span>
-                </div>
-                <div class="endpoint-row" style="padding: 6px 10px;">
-                  <span class="method-badge method-GET">GET</span>
-                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/api/products</span>
-                  <span class="badge">Catalog</span>
-                </div>
-                <div class="endpoint-row" style="padding: 6px 10px;">
-                  <span class="method-badge method-POST">POST</span>
-                  <span style="font-family: var(--font-mono); font-size: 12px; flex: 1;">/api/orders</span>
-                  <span class="badge badge-warning">201 Created</span>
-                </div>
-              </div>
+              <button class="btn btn-dark product-action-btn" type="button" onclick="switchTab('schedules')">
+                Setup Cron Schedules →
+              </button>
             </div>
+
+            <!-- Product 3: Alarm on Failure & Stop Circuit-Breaker -->
+            <div class="product-card">
+              <div class="product-card-top">
+                <div class="product-card-header">
+                  <span class="product-icon">🛑</span>
+                  <span class="product-tag product-tag-alarm">Reliability</span>
+                </div>
+                <h3 class="product-title">Alarm on Failure & Circuit Breaker</h3>
+                <p class="product-desc">
+                  Protect downstream servers from denial-of-service and runaway cloud bills. Automatically abort benchmarks when server errors breach your threshold, and dispatch instant alerts.
+                </p>
+                <ul class="product-features-list">
+                  <li>Auto-stop benchmark when failure count exceeds N errors</li>
+                  <li>Instant alert webhooks to Slack, Microsoft Teams, Discord</li>
+                  <li>Configurable SLA breach gatekeeper policies</li>
+                  <li>Payload diagnostics with reproduction cURL commands</li>
+                </ul>
+              </div>
+              <button class="btn btn-secondary product-action-btn" type="button" onclick="switchTab('alarms')">
+                Configure Failure Alarms →
+              </button>
+            </div>
+
+            <!-- Product 4: Distributed APM Tracing -->
+            <div class="product-card">
+              <div class="product-card-top">
+                <div class="product-card-header">
+                  <span class="product-icon">🔍</span>
+                  <span class="product-tag product-tag-apm">Observability</span>
+                </div>
+                <h3 class="product-title">Distributed APM Tracing</h3>
+                <p class="product-desc">
+                  Connect high-volume load test requests directly to backend microservice waterfalls. Injects standard W3C traceparent headers to correlate k6 spikes with Jaeger, Zipkin, and Datadog.
+                </p>
+                <ul class="product-features-list">
+                  <li>W3C Trace Context (traceparent, baggage, X-Trace-Id)</li>
+                  <li>Downstream propagation across Spring Boot, Node, Go, K8s</li>
+                  <li>Automatic sample trace recording saved in PostgreSQL</li>
+                  <li>Direct 1-click links opening span waterfalls in your APM</li>
+                </ul>
+              </div>
+              <button class="btn btn-secondary product-action-btn" type="button" onclick="switchTab('managementReport')">
+                View Tracing & APM →
+              </button>
+            </div>
+
+            <!-- Product 5: Executive & Allure Reports -->
+            <div class="product-card">
+              <div class="product-card-top">
+                <div class="product-card-header">
+                  <span class="product-icon">📊</span>
+                  <span class="product-tag product-tag-report">Reporting</span>
+                </div>
+                <h3 class="product-title">Executive & Allure 2 Reports</h3>
+                <p class="product-desc">
+                  Deliver clear, stakeholder-ready results. Instant executive HTML reports with SLA pass/fail verdicts, latency percentiles, and deep Allure 2 interactive defect classifications.
+                </p>
+                <ul class="product-features-list">
+                  <li>Executive KPI summary cards and SLA compliance matrix</li>
+                  <li>Interactive latency percentile charts (avg, med, p95, p99)</li>
+                  <li>Allure 2 test suites with categorized failure analysis</li>
+                  <li>Tenant-scoped archive with printable PDF export</li>
+                </ul>
+              </div>
+              <button class="btn btn-secondary product-action-btn" type="button" onclick="switchTab('managementReport')">
+                Explore Reports Center →
+              </button>
+            </div>
+
+            <!-- Product 6: Multi-Tenant Workspace & RBAC -->
+            <div class="product-card">
+              <div class="product-card-top">
+                <div class="product-card-header">
+                  <span class="product-icon">🏢</span>
+                  <span class="product-tag product-tag-core">Platform</span>
+                </div>
+                <h3 class="product-title">Multi-Tenant Architecture & RBAC</h3>
+                <p class="product-desc">
+                  Enterprise multi-tenancy built from the ground up. Isolate organizations, projects, API keys, and test artifacts with role-based access control and PostgreSQL tenancy.
+                </p>
+                <ul class="product-features-list">
+                  <li>Strict tenant isolation for runs, specs, datasets, and logs</li>
+                  <li>Role-based access control (Admin, Developer, Viewer)</li>
+                  <li>Superadmin control plane with organization onboarding</li>
+                  <li>Enterprise starter kits for instant project bootstrapping</li>
+                </ul>
+              </div>
+              <button class="btn btn-secondary product-action-btn" type="button" onclick="document.getElementById('openTeamBtn')?.click()">
+                Manage Organization Team →
+              </button>
+            </div>
+
           </div>
         </div>
 
-        <!-- Pre-Configured Benchmark Specs Card -->
-        <div class="card">
+        <!-- Embedded Interactive Sandbox Card on the Landing Page -->
+        <div class="card" style="margin-top: 10px;">
           <div class="card-header">
-            <div class="card-title">Demo Test Profile & SLA Policy</div>
-            <span class="badge badge-primary">Pre-Configured</span>
+            <div>
+              <div class="card-title">Interactive 1-Click Sandbox Environment</div>
+              <div style="font-size: 12px; color: var(--text-muted);">
+                Test the complete pipeline right here without importing your own specs. Runs against the built-in Spring Boot mock API server.
+              </div>
+            </div>
+            <span class="badge badge-success" id="landingMockBadge">Mock API Active</span>
           </div>
           <div class="card-body">
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <div class="spec-info-row">
-                <span class="label">Specification:</span>
-                <span class="value">sample-openapi.json (OpenAPI 3.0.3)</span>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
+              <div style="padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
+                <div style="font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px;">Target Service</div>
+                <div style="font-family: var(--font-mono); font-size: 12px; color: var(--primary);">http://localhost:8080 (Spring Boot Core API)</div>
               </div>
-              <div class="spec-info-row">
-                <span class="label">Target Service:</span>
-                <span class="value">http://localhost:8080 (Spring Boot)</span>
+              <div style="padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
+                <div style="font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px;">Test Profile</div>
+                <div style="font-size: 12px; color: var(--text);">10 VUs Ramp (10s) • P95 &lt; 500ms • Stop on 10 Failures</div>
               </div>
-              <div class="spec-info-row">
-                <span class="label">Load Stages:</span>
-                <span class="value">10 VUs Ramp (10 seconds)</span>
-              </div>
-              <div class="spec-info-row">
-                <span class="label">Contract Validation:</span>
-                <span class="value">Enabled (Schemathesis Strict Check)</span>
-              </div>
-              <div class="spec-info-row">
-                <span class="label">p95 Latency SLA:</span>
-                <span class="value">&lt; 500 ms</span>
-              </div>
-              <div class="spec-info-row">
-                <span class="label">Error Tolerance:</span>
-                <span class="value">&lt; 1.0% failure rate</span>
-              </div>
-              <div class="spec-info-row">
-                <span class="label">Dataset:</span>
-                <span class="value">data/sample-users.csv (25 Parameterized Records)</span>
+              <div style="padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
+                <div style="font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px;">Included Endpoints</div>
+                <div style="font-size: 12px; color: var(--text);">/products, /orders, /auth/login, /health</div>
               </div>
             </div>
-
-            <div style="margin-top: 18px; padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
-              <div style="font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px;">Need custom testing?</div>
-              <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
-                Switch to the <strong>Real Test Studio</strong> tab to upload your own OpenAPI/Swagger JSON, configure custom payloads with dynamic variables, adjust VUs, and test external APIs.
-              </p>
-              <button id="goToRealStudioBtn" class="btn btn-secondary btn-sm">Go to Real Test Studio →</button>
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <button id="runDemoBenchmarkBtn" class="btn btn-primary btn-lg" type="button">
+                ⚡ Run Demo Benchmark (1-Click)
+              </button>
+              <button class="btn btn-secondary btn-lg" type="button" onclick="switchTab('studio')">
+                Open Full Real Studio →
+              </button>
             </div>
           </div>
         </div>
+
       </div>
     </section>
 
@@ -559,6 +699,25 @@
                 </label>
               </div>
 
+              <!-- Circuit Breaker & Stop on Failure -->
+              <div class="circuit-breaker-banner" style="margin-top: 12px; padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; width: 100%;">
+                  <div>
+                    <div style="font-weight: 600; color: var(--text); font-size: 12px;">🛑 Circuit Breaker & Stop on Failure</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Abort k6 execution immediately when total HTTP failures reach threshold</div>
+                  </div>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="checkbox" id="circuitBreakerEnabled" checked style="accent-color: var(--primary); width: 16px; height: 16px;" />
+                    <span style="font-size: 12px; font-weight: 600;">Enable</span>
+                  </label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                  <label for="maxFailuresToStopInput" style="font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 0;">Stop Test After (Failures):</label>
+                  <input type="number" id="maxFailuresToStopInput" value="10" min="1" max="1000" style="width: 90px; padding: 4px 8px; font-size: 12px;" />
+                  <span style="font-size: 11px; color: var(--text-muted);">Enforces native k6 abortOnFail</span>
+                </div>
+              </div>
+
               <!-- Action Footer -->
               <div style="margin-top: 16px; display: flex; gap: 12px;">
                 <button id="launchTestBtn" class="btn btn-primary btn-lg" style="flex: 2;" type="button">
@@ -572,6 +731,235 @@
             </div>
           </div>
 
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         TAB: AUTOMATED CRON BENCHMARKS
+         ==================================================================== -->
+    <section id="tab-schedules" class="tab-content">
+      <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+        
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Automated Cron Benchmark Schedules
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                Continuously benchmark your APIs without human intervention. Runs autonomous background k6 pipelines, tracks SLA regressions in PostgreSQL, and alerts team channels.
+              </div>
+            </div>
+            <button id="tabRefreshSchedulesBtn" class="btn btn-secondary btn-sm" type="button">
+              🔄 Refresh Schedules
+            </button>
+          </div>
+          <div class="card-body">
+            <div style="overflow-x: auto;">
+              <table class="table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Schedule Name</th>
+                    <th>Cron Interval</th>
+                    <th>Target Env</th>
+                    <th>Profile (VUs / Duration)</th>
+                    <th>Last Status</th>
+                    <th style="text-align: right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="schedulesTabTableBody">
+                  <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 18px;">Loading schedules...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Create New Schedule Form Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              + Create New Automated Benchmark Schedule
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-2" style="gap: 16px;">
+              <div class="input-group">
+                <label for="tabNewSchName">Schedule Name</label>
+                <input type="text" id="tabNewSchName" placeholder="e.g. Nightly 2 AM Staging Regression" />
+              </div>
+              <div class="input-group">
+                <label for="tabNewSchPreset">Frequency Preset</label>
+                <select id="tabNewSchPreset">
+                  <option value="0 2 * * *">Nightly at 2:00 AM (0 2 * * *)</option>
+                  <option value="0 */6 * * *">Every 6 Hours (0 */6 * * *)</option>
+                  <option value="0 * * * *">Hourly (0 * * * *)</option>
+                  <option value="0 0 * * 0">Weekly Sunday Midnight (0 0 * * 0)</option>
+                  <option value="custom">Custom Cron Expression</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap: 16px; margin-top: 10px;">
+              <div class="input-group">
+                <label for="tabNewSchCron">Cron Expression (5-field)</label>
+                <input type="text" id="tabNewSchCron" value="0 2 * * *" style="font-family: var(--font-mono);" />
+              </div>
+              <div class="input-group">
+                <label for="tabNewSchEnv">Target Environment</label>
+                <select id="tabNewSchEnv">
+                  <option value="staging">Staging (Default)</option>
+                  <option value="production">Production</option>
+                  <option value="dev">Development</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-4" style="gap: 12px; margin-top: 10px;">
+              <div class="input-group">
+                <label for="tabNewSchVus">Peak VUs</label>
+                <input type="number" id="tabNewSchVus" value="25" min="1" max="500" />
+              </div>
+              <div class="input-group">
+                <label for="tabNewSchDuration">Duration (s)</label>
+                <input type="number" id="tabNewSchDuration" value="20" min="5" max="300" />
+              </div>
+              <div class="input-group">
+                <label for="tabNewSchP95">p95 SLA (ms)</label>
+                <input type="number" id="tabNewSchP95" value="500" min="50" max="10000" />
+              </div>
+              <div class="input-group">
+                <label for="tabNewSchErrorRate">Max Error (%)</label>
+                <input type="number" id="tabNewSchErrorRate" value="1.0" step="0.1" min="0" max="100" />
+              </div>
+            </div>
+
+            <div style="margin-top: 16px; display: flex; gap: 12px;">
+              <button id="submitTabCreateScheduleBtn" class="btn btn-primary" type="button">
+                + Save Benchmark Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         TAB: ALARMS, WEBHOOKS & CIRCUIT BREAKERS
+         ==================================================================== -->
+    <section id="tab-alarms" class="tab-content">
+      <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+
+        <!-- Circuit-Breaker Policy Card -->
+        <div class="circuit-breaker-banner">
+          <div class="circuit-breaker-info">
+            <div class="circuit-breaker-title">
+              <span>🛑</span>
+              <span>Downstream Safety Circuit Breaker Policy</span>
+            </div>
+            <div class="circuit-breaker-desc">
+              When benchmarking high-concurrency APIs, sudden server outages (500s/503s) can trigger cascading failures and heavy cloud expenses.
+              Our engine embeds k6 native <code>abortOnFail</code> circuit breakers to immediately stop the test execution the exact instant failure counts cross your safety threshold.
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn btn-secondary btn-sm" type="button" onclick="switchTab('studio')">
+              Adjust Stop-on-Failure in Studio →
+            </button>
+          </div>
+        </div>
+
+        <!-- Webhook Alerts Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                Registered Alert Webhooks
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                Instant notifications dispatched to Slack, Microsoft Teams, Discord, or APM monitoring platforms on SLA breaches and completed runs.
+              </div>
+            </div>
+            <button id="tabRefreshWebhooksBtn" class="btn btn-secondary btn-sm" type="button">
+              🔄 Refresh Webhooks
+            </button>
+          </div>
+          <div class="card-body">
+            <div style="overflow-x: auto;">
+              <table class="table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Webhook Name</th>
+                    <th>Target URL</th>
+                    <th>Subscribed Events</th>
+                    <th>Last Dispatched</th>
+                    <th style="text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="webhooksTabTableBody">
+                  <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 18px;">Loading webhooks...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Register New Webhook Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              + Register New Alert Webhook
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-2" style="gap: 16px;">
+              <div class="input-group">
+                <label for="tabNewWebhookName">Webhook Name</label>
+                <input type="text" id="tabNewWebhookName" placeholder="e.g. #incident-response Slack Channel" />
+              </div>
+              <div class="input-group">
+                <label for="tabNewWebhookUrl">Target Webhook URL</label>
+                <input type="url" id="tabNewWebhookUrl" placeholder="https://hooks.slack.com/services/... or https://discord.com/api/webhooks/..." />
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap: 16px; margin-top: 10px;">
+              <div class="input-group">
+                <label>Subscribed Alert Events</label>
+                <div style="display: flex; gap: 16px; margin-top: 6px;">
+                  <label style="font-weight: 500; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" id="tabWhEventCompleted" checked style="accent-color: var(--primary);" /> Benchmark Completed
+                  </label>
+                  <label style="font-weight: 500; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" id="tabWhEventFailed" checked style="accent-color: var(--primary);" /> SLA Threshold Failed (Alert)
+                  </label>
+                </div>
+              </div>
+              <div class="input-group">
+                <label for="tabNewWebhookSecret">HMAC Secret Key (Optional)</label>
+                <input type="text" id="tabNewWebhookSecret" placeholder="Optional secret for SHA256 signature verification" />
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 16px; align-items: center;">
+              <button id="tabTestWebhookBtn" class="btn btn-secondary" type="button">
+                🧪 Send Test Ping
+              </button>
+              <button id="submitTabCreateWebhookBtn" class="btn btn-primary" type="button">
+                + Save Webhook
+              </button>
+            </div>
+            <div id="tabTestWebhookFeedback" style="margin-top: 10px; font-size: 12px; font-family: var(--font-mono);"></div>
+          </div>
         </div>
 
       </div>

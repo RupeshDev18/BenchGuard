@@ -244,10 +244,16 @@ const th = config.thresholds || {};
 const p95 = th.p95Ms || 500;
 const p99 = th.p99Ms || 1000;
 const maxError = th.maxErrorRate ?? 0.01;
+const maxFailuresToStop = th.maxFailuresToStop || config.maxFailuresToStop || null;
+
+const failedRules = [`"rate<${maxError}"`];
+if (maxFailuresToStop && Number(maxFailuresToStop) > 0) {
+  failedRules.push(`{ threshold: "count<${Number(maxFailuresToStop)}", abortOnFail: true }`);
+}
 
 const thresholdRules = [
   `"http_req_duration": ["p(95)<${p95}", "p(99)<${p99}"]`,
-  `"http_req_failed": ["rate<${maxError}"]`,
+  `"http_req_failed": [${failedRules.join(", ")}]`,
 ];
 
 for (const ep of endpoints) {

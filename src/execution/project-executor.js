@@ -64,7 +64,8 @@ async function startProjectPipeline(options) {
         maxErrorRate,
         buildLabel = 'v1.0.0',
         triggeredBy = null,
-        scheduleId = null
+        scheduleId = null,
+        maxFailuresToStop = null
     } = options;
 
     if (activeProjectProcesses.has(projectId)) {
@@ -149,8 +150,12 @@ async function startProjectPipeline(options) {
     const thresholds = requestedThresholds || {
         p95Ms: p95ThresholdMs || 500,
         p99Ms: 1000,
-        maxErrorRate: maxErrorRate !== undefined ? maxErrorRate : 1.0
+        maxErrorRate: maxErrorRate !== undefined ? maxErrorRate : 1.0,
+        maxFailuresToStop: maxFailuresToStop ? parseInt(maxFailuresToStop, 10) : null
     };
+    if (maxFailuresToStop) {
+        thresholds.maxFailuresToStop = parseInt(maxFailuresToStop, 10);
+    }
 
     const isolatedConfig = {
         baseUrl: targetEnv.base_url,
@@ -161,6 +166,7 @@ async function startProjectPipeline(options) {
         datasetPath: activeDataset ? path.resolve(ROOT_DIR, activeDataset.file_path) : undefined,
         stages: stages,
         thresholds: thresholds,
+        maxFailuresToStop: thresholds.maxFailuresToStop,
         endpoints: { include: ["all"], exclude: [] },
         endpointConfigs: activeSpec.endpoint_configs || {},
         headers: targetEnv.default_headers || {},

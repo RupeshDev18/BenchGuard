@@ -10,11 +10,11 @@
     "stages": [
       {
         "duration": "3s",
-        "target": 50
+        "target": 5
       },
       {
         "duration": "4s",
-        "target": 70
+        "target": 10
       },
       {
         "duration": "3s",
@@ -25,7 +25,7 @@
   "thresholds": {
     "p95Ms": 500,
     "p99Ms": 1000,
-    "maxErrorRate": 0.02
+    "maxErrorRate": 0.01
   },
   "endpoints": {
     "include": [

@@ -556,6 +556,7 @@ router.post('/:projectId/pipeline/start', requireProjectRole(['admin', 'develope
             thresholds: req.body.thresholds,
             p95ThresholdMs: req.body.p95ThresholdMs,
             maxErrorRate: req.body.maxErrorRate,
+            maxFailuresToStop: req.body.maxFailuresToStop,
             buildLabel: req.body.buildLabel || 'v1.0.0',
             triggeredBy: req.user.id
         });
