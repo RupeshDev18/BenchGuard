@@ -110,33 +110,250 @@ function applyTheme(theme) {
 }
 
 // -------------------------------------------------------------
-// 3. Navigation & Tab Switching
+// 3. Navigation & Client-Side SPA Router
 // -------------------------------------------------------------
-function initTabs() {
-  const tabs = document.querySelectorAll(".tab-btn");
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const targetId = `tab-${tab.dataset.tab}`;
-      tabs.forEach((t) => t.classList.remove("active"));
-      tab.classList.add("active");
+const ROUTES = {
+  "/": { tab: "overview", title: "Platform Overview", icon: "🏠", category: "Core Testing" },
+  "/studio": { tab: "studio", title: "Test Studio (Load)", icon: "⚡", category: "Core Testing" },
+  "/console": { tab: "console", title: "Live Console", icon: "🖥️", category: "Core Testing" },
+  "/schedules": { tab: "schedules", title: "Cron Schedules", icon: "⏰", category: "Automation & Reliability" },
+  "/alarms": { tab: "alarms", title: "Alarms & Webhooks", icon: "🚨", category: "Automation & Reliability" },
+  "/reports/executive": { tab: "managementReport", title: "Executive SLA Report", icon: "📊", category: "Observability & Reports" },
+  "/reports/allure": { tab: "allureReport", title: "Allure 2 Deep-Dive", icon: "🏆", category: "Observability & Reports" },
+  "/history": { tab: "history", title: "Run History", icon: "📜", category: "Observability & Reports" },
+  "/analytics": { tab: "analytics", title: "Fleet Analytics & Trends", icon: "📈", category: "Observability & Reports" },
+  "/projects": { tab: "projects", title: "Projects & Starter Kits", icon: "📁", category: "Workspace & Governance" },
+  "/team": { tab: "team", title: "Team Members & Roles", icon: "👥", category: "Workspace & Governance" },
+  "/admin": { tab: "admin", title: "Superadmin Portal", icon: "🏢", category: "Workspace & Governance" }
+};
 
-      document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
-      const targetContent = document.getElementById(targetId);
-      if (targetContent) targetContent.classList.add("active");
+const ROUTE_ALIASES = {
+  "/overview": "/",
+  "/reports": "/reports/executive",
+  "/report": "/reports/executive",
+  "/allure": "/reports/allure"
+};
 
-      if (tab.dataset.tab === "history") loadRunHistory();
-      if (tab.dataset.tab === "analytics") loadAnalytics();
-      if (tab.dataset.tab === "managementReport") refreshIframes();
-      if (tab.dataset.tab === "allureReport") refreshIframes();
-      if (tab.dataset.tab === "studio") drawLoadCurve();
-      if (tab.dataset.tab === "schedules") loadSchedules();
-      if (tab.dataset.tab === "alarms") loadWebhooks();
-    });
+const TAB_TO_ROUTE = {
+  "overview": "/",
+  "studio": "/studio",
+  "console": "/console",
+  "schedules": "/schedules",
+  "alarms": "/alarms",
+  "managementReport": "/reports/executive",
+  "allureReport": "/reports/allure",
+  "history": "/history",
+  "analytics": "/analytics",
+  "projects": "/projects",
+  "team": "/team",
+  "admin": "/admin"
+};
+
+function getCurrentRoutePath() {
+  const hash = window.location.hash;
+  if (hash && hash.startsWith("#/")) {
+    return hash.slice(1);
+  }
+  const path = window.location.pathname;
+  if (path && path !== "") {
+    return path;
+  }
+  return "/";
+}
+
+function getCurrentRoute() {
+  let path = getCurrentRoutePath();
+  if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+  if (ROUTE_ALIASES[path]) path = ROUTE_ALIASES[path];
+  return ROUTES[path] || ROUTES["/"];
+}
+
+function navigateTo(path, options = { replace: false, skipHistory: false }) {
+  if (!path) path = "/";
+  path = path.trim();
+  if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+  if (ROUTE_ALIASES[path]) path = ROUTE_ALIASES[path];
+
+  const route = ROUTES[path] || ROUTES["/"];
+  const targetPath = ROUTES[path] ? path : "/";
+
+  if (!options.skipHistory) {
+    try {
+      if (options.replace) {
+        window.history.replaceState({ path: targetPath }, "", targetPath);
+      } else if (window.location.pathname !== targetPath) {
+        window.history.pushState({ path: targetPath }, "", targetPath);
+      }
+    } catch (_) {
+      window.location.hash = "#" + targetPath;
+    }
+  }
+
+  document.title = `${route.title} | k6 & Allure Performance Studio`;
+  updateBreadcrumbs(route);
+
+  // Update Nav links
+  document.querySelectorAll("[data-nav-route]").forEach(link => {
+    if (link.getAttribute("data-nav-route") === targetPath) {
+      link.classList.add("active");
+    } else {
+      link.classList.remove("active");
+    }
   });
+
+  // Backward compatibility with tab-btn
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    if (btn.dataset.tab === route.tab) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // Switch visible section
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  const targetContent = document.getElementById(`tab-${route.tab}`);
+  if (targetContent) {
+    targetContent.classList.add("active");
+  }
+
+  // Trigger page loaders
+  onRouteEnter(route.tab);
+
+  // Close mobile sidebar if open
+  const sidebar = document.getElementById("appSidebar");
+  if (sidebar && sidebar.classList.contains("mobile-open")) {
+    sidebar.classList.remove("mobile-open");
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function switchTab(tabName) {
+  const targetRoute = TAB_TO_ROUTE[tabName] || "/";
+  navigateTo(targetRoute);
+}
+
+function onRouteEnter(tabName) {
+  switch (tabName) {
+    case "history":
+      loadRunHistory();
+      break;
+    case "analytics":
+      loadAnalytics();
+      break;
+    case "managementReport":
+    case "allureReport":
+      refreshIframes();
+      break;
+    case "studio":
+      drawLoadCurve();
+      break;
+    case "schedules":
+      loadSchedules();
+      break;
+    case "alarms":
+      loadWebhooks();
+      break;
+    case "projects":
+      loadProjectsForCurrentOrg();
+      renderProjectsPageList();
+      loadAvailableTemplates();
+      break;
+    case "team":
+      loadTeamMembers();
+      break;
+    case "admin":
+      loadSuperadminDashboard();
+      break;
+  }
+}
+
+function updateBreadcrumbs(route) {
+  const orgEl = document.getElementById("bcOrg");
+  const projEl = document.getElementById("bcProject");
+  const pageEl = document.getElementById("bcPage");
+  const iconEl = document.getElementById("bcIcon");
+
+  if (orgEl) orgEl.textContent = authState.currentOrg ? authState.currentOrg.name : "Tenant Org";
+  if (projEl) projEl.textContent = authState.currentProject ? authState.currentProject.name : "Default Project";
+  if (pageEl) pageEl.textContent = route.title;
+  if (iconEl) iconEl.textContent = route.icon;
+}
+
+function initTabs() {
+  // Global click delegator for [data-nav-route]
+  document.addEventListener("click", (e) => {
+    const navItem = e.target.closest("[data-nav-route]");
+    if (navItem) {
+      e.preventDefault();
+      const route = navItem.getAttribute("data-nav-route");
+      navigateTo(route);
+    }
+  });
+
+  // Browser Back/Forward navigation listener
+  window.addEventListener("popstate", () => {
+    const path = getCurrentRoutePath();
+    navigateTo(path, { skipHistory: true });
+  });
+
+  window.addEventListener("hashchange", () => {
+    const path = getCurrentRoutePath();
+    navigateTo(path, { skipHistory: true });
+  });
+
+  // Sidebar Collapse Toggle
+  const sidebar = document.getElementById("appSidebar");
+  const toggleBtn = document.getElementById("sidebarToggleBtn");
+  if (sidebar && toggleBtn) {
+    const savedState = localStorage.getItem("k6_sidebar_collapsed");
+    if (savedState === "true") {
+      sidebar.classList.add("collapsed");
+      toggleBtn.textContent = "▶";
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+      const isCollapsed = sidebar.classList.contains("collapsed");
+      toggleBtn.textContent = isCollapsed ? "▶" : "◀";
+      localStorage.setItem("k6_sidebar_collapsed", isCollapsed ? "true" : "false");
+    });
+  }
+
+  // Mobile menu button toggle
+  const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+  if (mobileMenuBtn && sidebar) {
+    mobileMenuBtn.addEventListener("click", () => {
+      sidebar.classList.toggle("mobile-open");
+    });
+  }
+
+  // Quick Run CTAs (Sidebar & Topbar)
+  const handleQuickRunAction = () => {
+    navigateTo("/studio");
+    setTimeout(() => {
+      const launchBtn = document.getElementById("launchTestBtn");
+      if (launchBtn) {
+        launchBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+        launchBtn.focus();
+      }
+    }, 150);
+  };
+
+  const sidebarQuickRunBtn = document.getElementById("sidebarQuickRunBtn");
+  if (sidebarQuickRunBtn) {
+    sidebarQuickRunBtn.addEventListener("click", handleQuickRunAction);
+  }
+
+  const headerQuickRunBtn = document.getElementById("headerQuickRunBtn");
+  if (headerQuickRunBtn) {
+    headerQuickRunBtn.addEventListener("click", handleQuickRunAction);
+  }
 
   const goToRealStudioBtn = document.getElementById("goToRealStudioBtn");
   if (goToRealStudioBtn) {
-    goToRealStudioBtn.addEventListener("click", () => switchTab("studio"));
+    goToRealStudioBtn.addEventListener("click", () => navigateTo("/studio"));
   }
 
   const landingQuickDemoBtn = document.getElementById("landingQuickDemoBtn");
@@ -146,12 +363,12 @@ function initTabs() {
       if (runDemoBtn) runDemoBtn.click();
     });
   }
+
+  // Initial Route dispatch based on current URL path or hash
+  const initialPath = getCurrentRoutePath();
+  navigateTo(initialPath, { replace: true });
 }
 
-function switchTab(tabName) {
-  const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
-  if (btn) btn.click();
-}
 
 async function refreshIframes() {
   const mgmtIframe = document.getElementById("managementReportIframe");
@@ -247,7 +464,36 @@ function populateForm(cfg) {
     document.getElementById("flatDuration").value = cfg.load?.duration || "30s";
   }
 
+  // Distributed Load Generator Fleet
+  const workers = parseInt(cfg.workersCount || 1, 10);
+  document.querySelectorAll("#workerCountSelector .pill-option").forEach((btn) => {
+    if (parseInt(btn.dataset.workers, 10) === workers) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  updateWorkerSelectorNote(workers);
+
   drawLoadCurve();
+}
+
+function updateWorkerSelectorNote(workers) {
+  const noteEl = document.getElementById("workerDistributionNote");
+  const badgeEl = document.getElementById("distributedWorkerInfoBadge");
+  if (!noteEl || !badgeEl) return;
+
+  const w = parseInt(workers || 1, 10);
+  if (w <= 1) {
+    badgeEl.textContent = "1 Worker (Local Engine)";
+    badgeEl.className = "badge badge-primary";
+    noteEl.textContent = "Execution: 100% of VUs executed on Worker #1 (Segment: 0:1).";
+  } else {
+    badgeEl.textContent = `${w} Workers Distributed`;
+    badgeEl.className = "badge badge-success";
+    const slicePct = (100 / w).toFixed(1);
+    noteEl.textContent = `Partition: ${w} worker nodes in parallel (~${slicePct}% VUs per worker segment).`;
+  }
 }
 
 // -------------------------------------------------------------
@@ -1191,6 +1437,17 @@ function initActions() {
   document.getElementById("launchTestBtn").addEventListener("click", startPerformanceTest);
   document.getElementById("headerQuickRunBtn").addEventListener("click", startPerformanceTest);
 
+  // Distributed Load Generator Fleet Selector
+  document.querySelectorAll("#workerCountSelector .pill-option").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#workerCountSelector .pill-option").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const count = parseInt(btn.dataset.workers, 10) || 1;
+      updateWorkerSelectorNote(count);
+      drawLoadCurve();
+    });
+  });
+
   // Clear & Copy logs
   document.getElementById("clearLogsBtn").addEventListener("click", () => {
     document.getElementById("terminalOutput").innerHTML = "";
@@ -1277,6 +1534,11 @@ function collectConfigFromUI() {
     cfg.load.duration = document.getElementById("flatDuration").value.trim() || "30s";
   }
 
+  // Distributed Load Generator Fleet
+  const activeWorkerBtn = document.querySelector("#workerCountSelector .pill-option.active");
+  const workersCount = activeWorkerBtn ? parseInt(activeWorkerBtn.dataset.workers, 10) : 1;
+  cfg.workersCount = workersCount || 1;
+
   return cfg;
 }
 
@@ -1312,6 +1574,7 @@ async function startPerformanceTest() {
       headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         ...cfg,
+        workersCount: cfg.workersCount || 1,
         maxFailuresToStop: cfg.thresholds?.maxFailuresToStop || null,
         projectId: projId,
         orgId: authState.currentOrg?.id
@@ -1996,6 +2259,22 @@ function getAuthHeaders(customHeaders = {}) {
 }
 
 function openModal(modalId) {
+  if (modalId === "newProjectModal") {
+    navigateTo("/projects");
+    return;
+  }
+  if (modalId === "teamModal") {
+    navigateTo("/team");
+    return;
+  }
+  if (modalId === "superadminModal") {
+    navigateTo("/admin");
+    return;
+  }
+  if (modalId === "schedulesModal") {
+    navigateTo("/schedules");
+    return;
+  }
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.remove("hidden");
@@ -2073,6 +2352,7 @@ function updateUserSessionUi() {
   const roleEl = document.getElementById("userRoleBadge");
   const avatarEl = document.getElementById("userAvatar");
   const superadminBtn = document.getElementById("openSuperadminBtn");
+  const sidebarAdminLink = document.getElementById("sidebarAdminLink");
 
   if (user) {
     if (nameEl) nameEl.textContent = user.fullName || user.email;
@@ -2081,12 +2361,12 @@ function updateUserSessionUi() {
       const initial = (user.fullName || user.email || "U")[0].toUpperCase();
       avatarEl.textContent = initial;
     }
-    if (superadminBtn) {
-      if (user.isSuperadmin) {
-        superadminBtn.classList.remove("hidden");
-      } else {
-        superadminBtn.classList.add("hidden");
-      }
+    if (user.isSuperadmin) {
+      if (superadminBtn) superadminBtn.classList.remove("hidden");
+      if (sidebarAdminLink) sidebarAdminLink.classList.remove("hidden");
+    } else {
+      if (superadminBtn) superadminBtn.classList.add("hidden");
+      if (sidebarAdminLink) sidebarAdminLink.classList.add("hidden");
     }
   }
 }
@@ -2173,9 +2453,96 @@ async function loadProjectsForCurrentOrg() {
 
     // Refresh scoped views
     await onProjectChanged(selectedProj);
+    renderProjectsPageList();
+    updateBreadcrumbs(getCurrentRoute());
   } catch (err) {
     console.error("[SaaS] Error loading projects for org:", err);
   }
+}
+
+function renderProjectsPageList() {
+  const container = document.getElementById("projectsPageCards");
+  const countBadge = document.getElementById("projectsCountBadge");
+  const tenantBadge = document.getElementById("projectsTenantBadge");
+
+  if (tenantBadge && authState.currentOrg) {
+    tenantBadge.textContent = `${authState.currentOrg.name} (${(authState.currentOrg.plan_tier || 'STARTER').toUpperCase()})`;
+  }
+
+  if (!container) return;
+
+  if (!authState.projects || authState.projects.length === 0) {
+    if (countBadge) countBadge.textContent = "0 Projects";
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 36px 20px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius);">
+        <div style="font-size: 32px; margin-bottom: 10px;">📁</div>
+        <div style="font-weight: 700; font-size: 15px; margin-bottom: 6px; color: var(--text);">No Projects in this Organization Yet</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">Create your first testing project below or initialize from a production starter kit.</div>
+        <a href="#newProjectSection" class="btn btn-primary btn-sm">+ Create First Project</a>
+      </div>
+    `;
+    return;
+  }
+
+  if (countBadge) countBadge.textContent = `${authState.projects.length} Project${authState.projects.length === 1 ? '' : 's'}`;
+
+  container.innerHTML = "";
+  authState.projects.forEach(p => {
+    const isCurrent = authState.currentProject && authState.currentProject.id === p.id;
+    const card = document.createElement("div");
+    card.className = `project-card-item ${isCurrent ? 'is-current' : ''}`;
+    
+    card.innerHTML = `
+      <div class="project-card-meta">
+        <div class="project-card-name">${escapeHtml(p.name)}</div>
+        <div class="project-card-slug">${escapeHtml(p.slug || p.id)}</div>
+        <div class="project-card-desc">${escapeHtml(p.description || "OpenAPI test suite with automated SLA benchmarks.")}</div>
+      </div>
+      <div class="project-card-stats">
+        <span>Target: <strong>${escapeHtml(p.base_url || 'http://localhost:8080')}</strong></span>
+      </div>
+      <div class="project-card-footer">
+        ${isCurrent 
+          ? `<span class="badge badge-success" style="font-size: 11px;">✓ Active Project</span>`
+          : `<button class="btn btn-sm btn-dark switch-proj-btn" data-id="${p.id}" type="button">Switch to This</button>`
+        }
+        <button class="btn btn-sm btn-primary open-studio-proj-btn" data-id="${p.id}" type="button">⚡ Studio</button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll(".switch-proj-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const projId = btn.dataset.id;
+      const targetProj = authState.projects.find(p => p.id === projId);
+      if (targetProj) {
+        const sel = document.getElementById("headerProjectSelect");
+        if (sel) sel.value = targetProj.id;
+        authState.currentProject = targetProj;
+        localStorage.setItem(`k6_selected_project_${authState.currentOrg.id}`, targetProj.id);
+        await onProjectChanged(targetProj);
+        renderProjectsPageList();
+        updateBreadcrumbs(getCurrentRoute());
+        showToast(`Switched active project to ${targetProj.name}`, "info");
+      }
+    });
+  });
+
+  container.querySelectorAll(".open-studio-proj-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const projId = btn.dataset.id;
+      const targetProj = authState.projects.find(p => p.id === projId);
+      if (targetProj) {
+        const sel = document.getElementById("headerProjectSelect");
+        if (sel) sel.value = targetProj.id;
+        authState.currentProject = targetProj;
+        localStorage.setItem(`k6_selected_project_${authState.currentOrg.id}`, targetProj.id);
+        await onProjectChanged(targetProj);
+        navigateTo("/studio");
+      }
+    });
+  });
 }
 
 async function onProjectChanged(project) {

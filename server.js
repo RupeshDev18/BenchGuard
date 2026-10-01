@@ -655,7 +655,8 @@ app.post("/api/pipeline/start", (req, res) => {
     orgId: currentPipelineMeta.orgId
   });
 
-  activeProcess = spawn("node", ["run-pipeline.js", "--config", "config.json"], {
+  const workersArg = req.body?.workersCount ? ["--workers", String(req.body.workersCount)] : [];
+  activeProcess = spawn("node", ["run-pipeline.js", "--config", "config.json", ...workersArg], {
     cwd: ROOT_DIR,
     shell: true,
   });

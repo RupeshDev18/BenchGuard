@@ -70,21 +70,53 @@ if (genResult.status !== 0) {
   process.exit(genResult.status || 1);
 }
 
-// 2. Run k6 load test
+// 2. Run k6 load test (Single worker or Distributed Worker Pool)
 const summaryJson = path.join(outDir, "k6-summary.json");
-const k6Result = runStep(
-  "2/5 Executing k6 Load Test",
-  "k6",
-  ["run", `--summary-export=${summaryJson}`, loadtestScript]
-);
+const configData = JSON.parse(fs.readFileSync(configPath, "utf8"));
+const workersCount = Math.max(1, parseInt(getArg("workers", configData.workersCount || 1), 10));
 
-// Note: k6 returns code 99 if thresholds failed, but we still want to generate reports!
-const k6ThresholdFailed = k6Result.status !== 0;
-if (k6ThresholdFailed) {
-  console.warn("\n⚠️  k6 thresholds failed or k6 exited with non-zero code. Continuing to generate reports.");
+let k6ThresholdFailed = false;
+
+async function executeK6Step() {
+  if (workersCount > 1) {
+    console.log(`\n------------------------------------------------------------------`);
+    console.log(`[PIPELINE STEP] 2/5 Executing Distributed k6 Swarm (${workersCount} Workers)`);
+    console.log(`------------------------------------------------------------------`);
+    const { WorkerPool } = require("./src/distributed/worker-pool");
+    const pool = new WorkerPool({
+      workersCount,
+      scriptPath: loadtestScript,
+      outDir,
+      configPath,
+      stopOnFailures: configData.stopOnFailures || 0,
+      onLog: (text, stream) => {
+        if (stream === "stderr") process.stderr.write(text);
+        else process.stdout.write(text);
+      },
+    });
+
+    const poolResult = await pool.run();
+    k6ThresholdFailed = !poolResult.success;
+    if (k6ThresholdFailed) {
+      console.warn("\n⚠️  k6 thresholds failed, circuit breaker tripped, or worker exited with non-zero code. Continuing to generate reports.");
+    }
+  } else {
+    const k6Result = runStep(
+      "2/5 Executing k6 Load Test",
+      "k6",
+      ["run", `--summary-export=${summaryJson}`, loadtestScript]
+    );
+    k6ThresholdFailed = k6Result.status !== 0;
+    if (k6ThresholdFailed) {
+      console.warn("\n⚠️  k6 thresholds failed or k6 exited with non-zero code. Continuing to generate reports.");
+    }
+  }
 }
 
-// 3. Run Schemathesis contract checks (if enabled)
+async function main() {
+  await executeK6Step();
+
+  // 3. Run Schemathesis contract checks (if enabled)
 const contractSummary = path.join(outDir, "contract-summary.json");
 runStep(
   "3/5 Checking API Contracts (Schemathesis)",
@@ -201,15 +233,22 @@ try {
   console.warn(`[pipeline] Warning: Failed to record run history: ${err.message}`);
 }
 
-console.log("\n==================================================================");
-console.log(" 🎉 PIPELINE COMPLETED SUCCESSFULLY!");
-console.log("==================================================================");
-console.log(` 📊 Executive Report  : ${managementReport}`);
-console.log(` 🔍 Allure Deep-Dive  : ${path.join(allureReportDir, "index.html")}`);
-console.log(` 📈 Raw k6 Summary    : ${summaryJson}`);
-console.log("==================================================================\n");
+  console.log("\n==================================================================");
+  console.log(" 🎉 PIPELINE COMPLETED SUCCESSFULLY!");
+  console.log("==================================================================");
+  console.log(` 📊 Executive Report  : ${managementReport}`);
+  console.log(` 🔍 Allure Deep-Dive  : ${path.join(allureReportDir, "index.html")}`);
+  console.log(` 📈 Raw k6 Summary    : ${summaryJson}`);
+  console.log("==================================================================\n");
 
-// If k6 thresholds failed, exit with 1 for CI/CD gating if desired
-if (k6ThresholdFailed) {
-  process.exit(1);
+  // If k6 thresholds failed, exit with 1 for CI/CD gating if desired
+  if (k6ThresholdFailed) {
+    process.exit(1);
+  }
 }
+
+main().catch((err) => {
+  console.error(`\n❌ Pipeline crashed with unhandled exception: ${err.message}`);
+  process.exit(1);
+});
+

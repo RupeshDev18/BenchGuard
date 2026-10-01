@@ -15,84 +15,106 @@
   <!-- Floating Toast Notifications Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- Top App Header -->
-  <header class="app-header">
-    <div class="header-container">
-      <div class="header-brand">
-        <div class="brand-icon">k6</div>
-        <div>
-          <div class="brand-title">Performance & Load Testing Studio</div>
-          <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
-            OpenAPI • k6 Engine • Schemathesis • Allure 2 Reports
+  <div class="app-layout" id="appLayout">
+    <!-- Collapsible App Sidebar -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="/" class="sidebar-brand" data-nav-route="/">
+          <div class="brand-icon">k6</div>
+          <div class="brand-meta">
+            <div class="brand-title">Performance Studio</div>
+            <div class="brand-sub">OpenAPI • k6 • Allure 2</div>
           </div>
-        </div>
-        <span class="brand-badge">Enterprise</span>
+        </a>
+        <button id="sidebarToggleBtn" class="sidebar-toggle-btn" title="Toggle Sidebar" type="button">
+          ◀
+        </button>
       </div>
 
-      <div class="header-actions">
-        <!-- Theme Toggle Button (Light/Dark) -->
-        <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Light/Dark Theme">
-          ☀️
-        </button>
-
-        <!-- PostgreSQL Database Storage Status -->
-        <div class="status-indicator" id="dbStatusIndicator" title="PostgreSQL Storage Connection">
-          <span class="status-dot status-dot-offline" id="dbStatusDot"></span>
-          <span id="dbStatusText">🐘 DB: Checking...</span>
-        </div>
-
-        <!-- Live System WebSocket Status -->
-        <div class="status-indicator">
-          <span class="status-dot" id="wsStatusDot"></span>
-          <span id="wsStatusText">Connecting...</span>
-        </div>
-
-        <!-- Pipeline Execution State -->
-        <div class="status-indicator">
-          <span class="status-dot" id="pipelineStatusDot"></span>
-          <span id="pipelineStatusText">IDLE</span>
-          <span id="pipelineTimer" class="hidden text-primary" style="font-weight: 700;">(00:00)</span>
-        </div>
-
-        <button id="headerQuickRunBtn" class="btn btn-primary btn-sm">
+      <!-- Quick Action CTA -->
+      <div class="sidebar-quick-action">
+        <button id="sidebarQuickRunBtn" class="btn btn-primary btn-block btn-sm" type="button" style="width: 100%; justify-content: center;">
           ⚡ Quick Run
         </button>
-        <button id="headerAbortBtn" class="btn btn-danger btn-sm hidden">
-          ⛔ Abort Run
-        </button>
-      </div>
-    </div>
-
-    <!-- SaaS Multi-Tenant Workspace & Switcher Bar -->
-    <div class="workspace-bar">
-      <div class="workspace-nav-left">
-        <div class="workspace-item">
-          <span class="workspace-icon">🏢</span>
-          <label for="headerOrgSelect" class="workspace-label">TENANT:</label>
-          <select id="headerOrgSelect" class="workspace-select" title="Switch Tenant Organization"></select>
-        </div>
-        <span class="workspace-slash">/</span>
-        <div class="workspace-item">
-          <span class="workspace-icon">📁</span>
-          <label for="headerProjectSelect" class="workspace-label">PROJECT:</label>
-          <select id="headerProjectSelect" class="workspace-select" title="Switch Project"></select>
-        </div>
-        <button id="openNewProjectBtn" class="btn btn-sm btn-primary" type="button" title="Create New Project or Launch from Starter Kit">
-          + New Project
-        </button>
       </div>
 
-      <div class="workspace-nav-right">
-        <button id="openSchedulesBtn" class="btn btn-sm btn-dark" type="button" title="Automated Cron Benchmarks & Alert Webhooks">
-          ⏰ Schedules & Alerts
-        </button>
-        <button id="openTeamBtn" class="btn btn-sm btn-dark" type="button" title="Manage Organization Members & Roles">
-          👥 Team
-        </button>
-        <button id="openSuperadminBtn" class="btn btn-sm btn-dark hidden" type="button" title="Platform Superadmin Portal">
-          🏢 Superadmin Portal
-        </button>
-        <div class="user-session-chip" id="userSessionChip" title="Click to Switch Account or Re-authenticate">
+      <!-- Sidebar Navigation Groups -->
+      <nav class="sidebar-nav">
+        <!-- Group 1: Core Testing -->
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Core Testing Suite</div>
+          <a href="/" class="nav-item active" data-nav-route="/">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Platform Overview</span>
+          </a>
+          <a href="/studio" class="nav-item" data-nav-route="/studio">
+            <span class="nav-icon">⚡</span>
+            <span class="nav-label">Test Studio (Load)</span>
+            <span class="nav-badge badge-primary">k6</span>
+          </a>
+          <a href="/console" class="nav-item" data-nav-route="/console">
+            <span class="nav-icon">🖥️</span>
+            <span class="nav-label">Live Console</span>
+            <span class="nav-badge badge-live" id="consoleLiveBadge">Live</span>
+          </a>
+        </div>
+
+        <!-- Group 2: Automation & Reliability -->
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Automation & Reliability</div>
+          <a href="/schedules" class="nav-item" data-nav-route="/schedules">
+            <span class="nav-icon">⏰</span>
+            <span class="nav-label">Cron Schedules</span>
+          </a>
+          <a href="/alarms" class="nav-item" data-nav-route="/alarms">
+            <span class="nav-icon">🚨</span>
+            <span class="nav-label">Alarms & Webhooks</span>
+          </a>
+        </div>
+
+        <!-- Group 3: Observability & Reports -->
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Observability & Reports</div>
+          <a href="/reports/executive" class="nav-item" data-nav-route="/reports/executive">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Executive SLA Report</span>
+          </a>
+          <a href="/reports/allure" class="nav-item" data-nav-route="/reports/allure">
+            <span class="nav-icon">🏆</span>
+            <span class="nav-label">Allure 2 Deep-Dive</span>
+          </a>
+          <a href="/history" class="nav-item" data-nav-route="/history">
+            <span class="nav-icon">📜</span>
+            <span class="nav-label">Run History</span>
+          </a>
+          <a href="/analytics" class="nav-item" data-nav-route="/analytics">
+            <span class="nav-icon">📈</span>
+            <span class="nav-label">Fleet Analytics & Trends</span>
+          </a>
+        </div>
+
+        <!-- Group 4: Workspace & Governance -->
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">Workspace & Governance</div>
+          <a href="/projects" class="nav-item" data-nav-route="/projects">
+            <span class="nav-icon">📁</span>
+            <span class="nav-label">Projects & Starter Kits</span>
+          </a>
+          <a href="/team" class="nav-item" data-nav-route="/team">
+            <span class="nav-icon">👥</span>
+            <span class="nav-label">Team Members & Roles</span>
+          </a>
+          <a href="/admin" class="nav-item hidden" data-nav-route="/admin" id="sidebarAdminLink">
+            <span class="nav-icon">🏢</span>
+            <span class="nav-label">Superadmin Portal</span>
+            <span class="nav-badge badge-warning">Root</span>
+          </a>
+        </div>
+      </nav>
+
+      <!-- Sidebar User Profile Footer -->
+      <div class="sidebar-footer">
+        <div class="user-session-chip" id="userSessionChip" title="Click to Switch Account or Re-authenticate" style="cursor: pointer;">
           <span class="user-avatar" id="userAvatar">A</span>
           <div class="user-meta">
             <span class="user-name" id="userFullNameText">Superadmin</span>
@@ -100,44 +122,88 @@
           </div>
         </div>
       </div>
-    </div>
+    </aside>
 
-    <!-- Navigation Tabs -->
-    <nav class="app-nav">
-      <div class="nav-container">
-        <button class="tab-btn active" data-tab="overview">
-          🏠 Platform Overview
-        </button>
-        <button class="tab-btn" data-tab="studio">
-          ⚡ Test Studio (Load Testing)
-        </button>
-        <button class="tab-btn" data-tab="schedules">
-          ⏰ Cron Schedules
-        </button>
-        <button class="tab-btn" data-tab="alarms">
-          🚨 Alarms & Webhooks
-        </button>
-        <button class="tab-btn" data-tab="console">
-          🖥️ Live Console
-        </button>
-        <button class="tab-btn" data-tab="managementReport">
-          📊 Executive Report
-        </button>
-        <button class="tab-btn" data-tab="allureReport">
-          🏆 Allure 2 Deep-Dive
-        </button>
-        <button class="tab-btn" data-tab="history">
-          📜 Run History
-        </button>
-        <button class="tab-btn" data-tab="analytics">
-          📈 Analytics & Trends
-        </button>
-      </div>
-    </nav>
-  </header>
+    <!-- Main Application Panel -->
+    <div class="app-main-panel">
+      <!-- Topbar Header -->
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-menu-btn" title="Toggle Navigation Menu" type="button">
+            ☰
+          </button>
+          <!-- Dynamic Breadcrumbs -->
+          <nav class="breadcrumb-trail" aria-label="Breadcrumb">
+            <span class="bc-item" id="bcOrg">Tenant Org</span>
+            <span class="bc-sep">/</span>
+            <span class="bc-item" id="bcProject">Default Project</span>
+            <span class="bc-sep">/</span>
+            <span class="bc-page">
+              <span id="bcIcon">🏠</span>
+              <span id="bcPage">Platform Overview</span>
+            </span>
+          </nav>
+        </div>
 
-  <!-- Main Content -->
-  <main class="main-content">
+        <div class="topbar-right">
+          <!-- Tenant & Project Quick Switcher -->
+          <div class="topbar-workspace-switcher">
+            <div class="workspace-field">
+              <span class="ws-label">TENANT:</span>
+              <select id="headerOrgSelect" class="workspace-select" title="Switch Tenant Organization"></select>
+            </div>
+            <span class="ws-divider">/</span>
+            <div class="workspace-field">
+              <span class="ws-label">PROJECT:</span>
+              <select id="headerProjectSelect" class="workspace-select" title="Switch Project"></select>
+            </div>
+            <button id="openNewProjectBtn" class="btn btn-sm btn-primary" type="button" title="Create New Project">
+              + New
+            </button>
+          </div>
+
+          <!-- Status Indicator Hub -->
+          <div class="topbar-status-hub">
+            <div class="status-indicator" id="dbStatusIndicator" title="PostgreSQL Storage Connection">
+              <span class="status-dot status-dot-offline" id="dbStatusDot"></span>
+              <span id="dbStatusText">🐘 DB: Checking...</span>
+            </div>
+
+            <div class="status-indicator" title="WebSocket Live Stream">
+              <span class="status-dot" id="wsStatusDot"></span>
+              <span id="wsStatusText">Connecting...</span>
+            </div>
+
+            <div class="status-indicator" title="Pipeline State">
+              <span class="status-dot" id="pipelineStatusDot"></span>
+              <span id="pipelineStatusText">IDLE</span>
+              <span id="pipelineTimer" class="hidden text-primary" style="font-weight: 700;">(00:00)</span>
+            </div>
+          </div>
+
+          <!-- Global Actions -->
+          <div class="topbar-actions">
+            <!-- Hidden backward-compatibility buttons for script triggers -->
+            <button id="openSchedulesBtn" class="hidden" type="button"></button>
+            <button id="openTeamBtn" class="hidden" type="button"></button>
+            <button id="openSuperadminBtn" class="hidden" type="button"></button>
+
+            <!-- Theme Toggle Button -->
+            <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Light/Dark Theme" type="button">
+              ☀️
+            </button>
+            <button id="headerQuickRunBtn" class="btn btn-primary btn-sm" type="button">
+              ⚡ Quick Run
+            </button>
+            <button id="headerAbortBtn" class="btn btn-danger btn-sm hidden" type="button">
+              ⛔ Abort Run
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content Viewport -->
+      <main class="main-content" id="mainContent">
 
     <!-- ====================================================================
          TAB 1: SAAS PLATFORM OVERVIEW & PRODUCT LANDING PAGE
@@ -449,7 +515,31 @@
     <!-- ====================================================================
          TAB 2: REAL TEST STUDIO (100% Fully Customizable)
          ==================================================================== -->
-    <section id="tab-studio" class="tab-content">
+    <section id="tab-studio" class="tab-content" data-route="/studio">
+      <!-- Distinct Page Header: Test Studio -->
+      <div class="page-header accent-primary">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">SPEC-TO-K6 ENGINE</span>
+            <span class="badge badge-success" id="studioMockStatusBadge">Mock API Active</span>
+          </div>
+          <div class="page-header-title">
+            <span>⚡</span> Test Studio & Custom Scenarios
+          </div>
+          <div class="page-header-subtitle">
+            Configure OpenAPI specifications, endpoint parameters, ramping load curves, and stop-on-failure circuit breakers.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button id="studioQuickRunBtn" class="btn btn-primary btn-sm" type="button" onclick="document.getElementById('launchTestBtn').click()">
+            ⚡ Run Test Suite
+          </button>
+          <button id="studioSampleSpecBtn" class="btn btn-secondary btn-sm" type="button" onclick="document.querySelector('[data-spec-mode=\'sample\']').click()">
+            📥 Load Sample Spec
+          </button>
+        </div>
+      </div>
+
       <div class="studio-grid">
 
         <!-- Column Left: Spec Ingestion, Target & Endpoints -->
@@ -713,6 +803,26 @@
                 </div>
                 <canvas id="loadCurveCanvas" height="70"></canvas>
               </div>
+
+              <!-- Distributed Load Generator Fleet Selector -->
+              <div class="distributed-workers-selector" style="margin-top: 14px; padding: 12px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <div>
+                    <div style="font-weight: 600; color: var(--text); font-size: 12px;">🌐 Distributed Load Generator Fleet</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Partition VUs across multi-process worker nodes using k6 execution segments</div>
+                  </div>
+                  <span class="badge badge-primary" id="distributedWorkerInfoBadge">1 Worker (Local Engine)</span>
+                </div>
+                <div class="pill-selector" id="workerCountSelector">
+                  <button type="button" class="pill-option active" data-workers="1">1 Worker</button>
+                  <button type="button" class="pill-option" data-workers="2">2 Workers (Dual)</button>
+                  <button type="button" class="pill-option" data-workers="4">4 Workers (Quad)</button>
+                  <button type="button" class="pill-option" data-workers="8">8 Workers (Swarm)</button>
+                </div>
+                <div id="workerDistributionNote" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 8px;">
+                  Execution: 100% of VUs executed on Worker #1 (Segment: 0:1).
+                </div>
+              </div>
             </div>
           </div>
 
@@ -792,7 +902,28 @@
     <!-- ====================================================================
          TAB: AUTOMATED CRON BENCHMARKS
          ==================================================================== -->
-    <section id="tab-schedules" class="tab-content">
+    <section id="tab-schedules" class="tab-content" data-route="/schedules">
+      <!-- Distinct Page Header: Cron Schedules -->
+      <div class="page-header accent-cyan">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">CONTINUOUS AUTOMATION</span>
+            <span class="badge badge-success">Daemon Active</span>
+          </div>
+          <div class="page-header-title">
+            <span>⏰</span> Automated Cron Benchmark Schedules
+          </div>
+          <div class="page-header-subtitle">
+            Continuously benchmark your APIs without human intervention. Runs autonomous background k6 pipelines, tracks SLA regressions in PostgreSQL, and alerts team channels.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button id="tabRefreshSchedulesBtnHeader" class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('tabRefreshSchedulesBtn').click()">
+            ↻ Refresh Schedules
+          </button>
+        </div>
+      </div>
+
       <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
         
         <div class="card">
@@ -906,7 +1037,28 @@
     <!-- ====================================================================
          TAB: ALARMS, WEBHOOKS & CIRCUIT BREAKERS
          ==================================================================== -->
-    <section id="tab-alarms" class="tab-content">
+    <section id="tab-alarms" class="tab-content" data-route="/alarms">
+      <!-- Distinct Page Header: Alarms & Webhooks -->
+      <div class="page-header accent-rose">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">DOWNSTREAM RESILIENCE</span>
+            <span class="badge badge-danger">Safety Circuit-Breaker</span>
+          </div>
+          <div class="page-header-title">
+            <span>🚨</span> Alarms, Webhooks & Circuit Breakers
+          </div>
+          <div class="page-header-subtitle">
+            Configure multi-channel alert webhooks (Slack, MS Teams, Discord, PagerDuty) and downstream protection policies to halt traffic on critical SLA breaches.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" type="button" onclick="loadWebhooks()">
+            ↻ Refresh Webhooks
+          </button>
+        </div>
+      </div>
+
       <div style="max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
 
         <!-- Circuit-Breaker Policy Card -->
@@ -1019,19 +1171,38 @@
 
 
     <!-- ====================================================================
-         TAB 3: LIVE STREAMING CONSOLE
+         TAB 3: LIVE STREAMING CONSOLE (/console)
          ==================================================================== -->
-    <section id="tab-console" class="tab-content">
+    <section id="tab-console" class="tab-content" data-route="/console">
+      <!-- Distinct Page Header: Console -->
+      <div class="page-header accent-primary">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">STREAMING TELEMETRY</span>
+            <span class="badge badge-live" id="consoleHeaderStatusBadge">Pipeline Live</span>
+          </div>
+          <div class="page-header-title">
+            <span>🖥️</span> Live Execution Console & Output
+          </div>
+          <div class="page-header-subtitle">
+            Real-time WebSocket terminal stream, live virtual user concurrency, and circuit breaker telemetry.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button id="clearLogsBtn" class="btn btn-dark btn-sm" type="button">Clear Logs</button>
+          <button id="copyLogsBtn" class="btn btn-dark btn-sm" type="button">Copy Logs</button>
+          <button id="abortTestBtn" class="btn btn-danger btn-sm hidden" type="button">⛔ Abort Execution</button>
+        </div>
+      </div>
+
       <div class="terminal-card">
         <div class="terminal-header">
           <div class="terminal-title">
             <span class="status-dot running"></span>
             <span>PIPELINE EXECUTION LOGS • k6 & SCHEMATHESIS RUNNER</span>
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button id="clearLogsBtn" class="btn btn-dark btn-sm" type="button">Clear</button>
-            <button id="copyLogsBtn" class="btn btn-dark btn-sm" type="button">Copy Logs</button>
-            <button id="abortTestBtn" class="btn btn-danger btn-sm hidden" type="button">Abort Execution</button>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+            Auto-scroll enabled
           </div>
         </div>
         <div class="terminal-output" id="terminalOutput">
@@ -1040,48 +1211,85 @@
       </div>
     </section>
 
-
     <!-- ====================================================================
-         TAB 4: EXECUTIVE MANAGEMENT REPORT
+         TAB 4: EXECUTIVE MANAGEMENT REPORT (/reports/executive)
          ==================================================================== -->
-    <section id="tab-managementReport" class="tab-content">
-      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-size: 14px; font-weight: 700; color: var(--text);">Executive SLA Compliance Report</div>
-        <div style="display: flex; gap: 8px;">
+    <section id="tab-managementReport" class="tab-content" data-route="/reports/executive">
+      <!-- Distinct Page Header: Executive Report -->
+      <div class="page-header accent-emerald">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">EXECUTIVE SUMMARY</span>
+            <span class="badge badge-success">SLA Report</span>
+          </div>
+          <div class="page-header-title">
+            <span>📊</span> Executive SLA & Quality Report
+          </div>
+          <div class="page-header-subtitle">
+            High-level overview of SLA compliance, response latency distributions, throughput stability, and regression verdicts.
+          </div>
+        </div>
+        <div class="page-header-actions">
           <button id="refreshReportBtn" class="btn btn-secondary btn-sm" type="button">↻ Reload Report</button>
-          <a href="/reports/report.html" target="_blank" class="btn btn-dark btn-sm">Open in New Tab ↗</a>
+          <a href="/reports/report.html" target="_blank" class="btn btn-primary btn-sm">Open in New Tab ↗</a>
         </div>
       </div>
+
       <div class="report-frame-container">
         <iframe id="managementReportIframe" class="report-frame" src="/reports/report.html"></iframe>
       </div>
     </section>
 
-
     <!-- ====================================================================
-         TAB 5: ALLURE 2 DEEP-DIVE
+         TAB 5: ALLURE 2 DEEP-DIVE (/reports/allure)
          ==================================================================== -->
-    <section id="tab-allureReport" class="tab-content">
-      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-size: 14px; font-weight: 700; color: var(--text);">Allure 2 Test Execution Report</div>
-        <div style="display: flex; gap: 8px;">
+    <section id="tab-allureReport" class="tab-content" data-route="/reports/allure">
+      <!-- Distinct Page Header: Allure 2 Report -->
+      <div class="page-header accent-purple">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">ROOT-CAUSE ANALYSIS</span>
+            <span class="badge badge-primary">Allure 2.32</span>
+          </div>
+          <div class="page-header-title">
+            <span>🏆</span> Allure 2 Interactive Test Report
+          </div>
+          <div class="page-header-subtitle">
+            Deep-dive test suites, step-by-step attachments, defect categorization, execution timelines, and behavior trees.
+          </div>
+        </div>
+        <div class="page-header-actions">
           <button id="refreshAllureBtn" class="btn btn-secondary btn-sm" type="button">↻ Reload Allure</button>
-          <a href="/reports/allure-report/index.html" target="_blank" class="btn btn-dark btn-sm">Open in New Tab ↗</a>
+          <a href="/reports/allure-report/index.html" target="_blank" class="btn btn-primary btn-sm">Open in New Tab ↗</a>
         </div>
       </div>
+
       <div class="report-frame-container">
         <iframe id="allureReportIframe" class="report-frame" src="/reports/allure-report/index.html"></iframe>
       </div>
     </section>
 
-
     <!-- ====================================================================
-         TAB 6: RUN HISTORY
+         TAB 6: RUN HISTORY (/history)
          ==================================================================== -->
-    <section id="tab-history" class="tab-content">
-      <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="font-size: 14px; font-weight: 700; color: var(--text);">Benchmark Run History (Last 30 Runs)</div>
-        <button id="refreshHistoryBtn" class="btn btn-secondary btn-sm" type="button">↻ Refresh History</button>
+    <section id="tab-history" class="tab-content" data-route="/history">
+      <!-- Distinct Page Header: Run History -->
+      <div class="page-header accent-cyan">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">AUDIT TRAIL</span>
+            <span class="badge badge-info">PostgreSQL Stored</span>
+          </div>
+          <div class="page-header-title">
+            <span>📜</span> Benchmark Run History & Audits
+          </div>
+          <div class="page-header-subtitle">
+            Chronological audit log of all previous performance test executions, environment configs, verdicts, and SLA stats.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button id="refreshHistoryBtn" class="btn btn-secondary btn-sm" type="button">↻ Refresh History</button>
+        </div>
       </div>
 
       <div class="card">
@@ -1113,17 +1321,23 @@
     </section>
 
     <!-- ====================================================================
-         TAB 7: ANALYTICS & TRENDS (PostgreSQL-Driven Dynamic Graphs)
+         TAB 7: ANALYTICS & TRENDS (/analytics)
          ==================================================================== -->
-    <section id="tab-analytics" class="tab-content">
-      <div class="analytics-header-bar">
-        <div>
-          <div style="font-size: 16px; font-weight: 700; color: var(--text);">Fleet Performance & Regression Analytics</div>
-          <div style="font-size: 12px; color: var(--text-muted);">
-            Real-time analytics constructed dynamically from PostgreSQL (<span class="text-mono" id="analyticsDbTarget">k6_performance_db</span>)
+    <section id="tab-analytics" class="tab-content" data-route="/analytics">
+      <!-- Distinct Page Header: Analytics -->
+      <div class="page-header accent-emerald">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">RELATIONAL DB TELEMETRY</span>
+            <span class="badge badge-success">Live PostgreSQL</span>
           </div>
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
+          <div class="page-header-title">
+            <span>📈</span> Fleet Performance & Regression Analytics
+          </div>
+          <div class="page-header-subtitle">
+            Historical latency regression curves, second-by-second execution profiles, and per-endpoint percentile metrics.
+          </div>
+        <div class="page-header-actions">
           <select id="analyticsEnvFilter" class="input-select" style="padding: 6px 12px; font-size: 12px; width: 150px;">
             <option value="all">All Environments</option>
             <option value="staging">Staging</option>
@@ -1230,7 +1444,397 @@
         </div>
       </div>
     </section>
+
+    <!-- ====================================================================
+         DEDICATED PAGE: PROJECTS & STARTER KITS (/projects)
+         ==================================================================== -->
+    <section id="tab-projects" class="tab-content" data-route="/projects">
+      <!-- Distinct Page Header -->
+      <div class="page-header accent-cyan">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">WORKSPACE ISOLATION</span>
+            <span class="badge badge-primary" id="projectsTenantBadge">Active Tenant</span>
+          </div>
+          <div class="page-header-title">
+            <span>📁</span> Projects & Starter Kits
+          </div>
+          <div class="page-header-subtitle">
+            Manage isolated testing workspaces, OpenAPI specifications, traffic scenarios, and launch new test suites from production starter kits.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" type="button" onclick="loadProjectsForCurrentOrg(); renderProjectsPageList();">
+            ↻ Refresh Projects
+          </button>
+          <a href="#newProjectSection" class="btn btn-primary btn-sm">
+            + New Project
+          </a>
+        </div>
+      </div>
+
+      <!-- Active Projects in Current Organization -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Existing Projects in Organization</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Select an active workspace to load its spec, parameter datasets, cron benchmarks, and SLA history.
+            </div>
+          </div>
+          <span class="badge badge-info" id="projectsCountBadge">0 Projects</span>
+        </div>
+        <div class="card-body">
+          <div class="projects-cards-container" id="projectsPageCards">
+            <!-- Rendered dynamically by app.js -->
+            <div style="color: var(--text-muted); padding: 20px; text-align: center; grid-column: 1 / -1;">
+              Loading organization projects...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create New Project Section -->
+      <div class="card" id="newProjectSection">
+        <div class="card-header">
+          <div class="card-title">
+            <span>➕</span> Create New Project / Choose Starter Kit
+          </div>
+          <span class="badge badge-primary">Step-by-Step Setup</span>
+        </div>
+        <div class="card-body">
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Projects isolate your OpenAPI specifications, load scenarios, parameterization datasets, and SLA regression history.
+          </div>
+
+          <div class="grid grid-2" style="gap: 16px;">
+            <div class="input-group">
+              <label for="newProjectName">Project Name *</label>
+              <input type="text" id="newProjectName" placeholder="e.g. Payments Gateway API" />
+            </div>
+            <div class="input-group">
+              <label for="newProjectSlug">Project Slug (URL Safe) *</label>
+              <input type="text" id="newProjectSlug" placeholder="e.g. payments-gateway-api" />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="newProjectDesc">Description (Optional)</label>
+            <input type="text" id="newProjectDesc" placeholder="e.g. Core transactional microservice with PCI-compliant tokenization" />
+          </div>
+
+          <div style="margin-top: 14px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 700;">Choose Initialization Template</label>
+            <div class="template-cards-grid" id="templateCardsGrid">
+              <div class="template-card active" data-template-id="minimal-rest-api">
+                <div class="template-card-header">
+                  <span class="template-card-title">Minimal REST Service (CRUD)</span>
+                  <span class="template-card-badge">REST</span>
+                </div>
+                <div class="template-card-desc">
+                  Pre-configured OpenAPI 3.0.3 spec with Items & Orders CRUD endpoints and staging targets.
+                </div>
+                <div class="template-card-features">
+                  <span class="template-pill">OpenAPI 3.0.3</span>
+                  <span class="template-pill">Dev / Staging</span>
+                  <span class="template-pill">Zero Code</span>
+                </div>
+              </div>
+
+              <div class="template-card" data-template-id="spring-boot-ecommerce">
+                <div class="template-card-header">
+                  <span class="template-card-title">Spring Boot E-Commerce API</span>
+                  <span class="template-card-badge">Full Spec</span>
+                </div>
+                <div class="template-card-desc">
+                  Production-grade store with Catalog, Cart, Checkout, Auth tokens, and sample-users CSV dataset.
+                </div>
+                <div class="template-card-features">
+                  <span class="template-pill">Catalog & Cart</span>
+                  <span class="template-pill">CSV Dataset</span>
+                  <span class="template-pill">Auth Tokens</span>
+                </div>
+              </div>
+
+              <div class="template-card" data-template-id="blank">
+                <div class="template-card-header">
+                  <span class="template-card-title">Blank Project</span>
+                  <span class="template-card-badge">Custom</span>
+                </div>
+                <div class="template-card-desc">
+                  Start from scratch. You will upload your own custom OpenAPI/Swagger JSON spec or fetch from URL.
+                </div>
+                <div class="template-card-features">
+                  <span class="template-pill">Custom Upload</span>
+                  <span class="template-pill">Any Spec</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="submitNewProjectBtn" class="btn btn-primary btn-lg" type="button">
+              ⚡ Create Project
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         DEDICATED PAGE: TEAM MEMBERS & RBAC (/team)
+         ==================================================================== -->
+    <section id="tab-team" class="tab-content" data-route="/team">
+      <!-- Distinct Page Header -->
+      <div class="page-header accent-purple">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">ACCESS CONTROL</span>
+            <span class="plan-badge plan-team" id="teamPlanBadge">TEAM</span>
+          </div>
+          <div class="page-header-title">
+            <span>👥</span> Team Members & Role Permissions
+          </div>
+          <div class="page-header-subtitle">
+            Manage organization members, assign role-based permissions (Admin, Developer, Viewer), and invite engineering teammates.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-muted); text-align: right;">
+            <div>Org: <strong id="teamOrgName" style="color: var(--text);">Acme Corporation</strong></div>
+            <div id="teamOrgPlan" style="font-size: 11px;">Plan: Team • Quota: 200 VUs</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" onclick="loadTeamMembers()">
+            ↻ Refresh Team
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-2" style="gap: 20px; align-items: start;">
+        <!-- Active Members List -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Active Organization Members</div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div style="overflow-x: auto;">
+              <table class="table" style="width: 100%; margin: 0;">
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                  </tr>
+                </thead>
+                <tbody id="teamMembersTableBody">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add New Member Form Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">➕ Invite Team Member</div>
+          </div>
+          <div class="card-body">
+            <div class="grid grid-2" style="gap: 12px;">
+              <div class="input-group">
+                <label for="newMemberName">Full Name</label>
+                <input type="text" id="newMemberName" placeholder="e.g. John Doe" />
+              </div>
+              <div class="input-group">
+                <label for="newMemberEmail">Email Address</label>
+                <input type="email" id="newMemberEmail" placeholder="john@company.com" />
+              </div>
+            </div>
+            <div class="grid grid-2" style="gap: 12px; margin-top: 10px;">
+              <div class="input-group">
+                <label for="newMemberPassword">Temporary Password</label>
+                <input type="password" id="newMemberPassword" value="Password@123" />
+              </div>
+              <div class="input-group">
+                <label for="newMemberRole">Access Role</label>
+                <select id="newMemberRole">
+                  <option value="developer" selected>Developer (Run Tests, Edit Scenarios)</option>
+                  <option value="viewer">Viewer (View Reports & Analytics)</option>
+                  <option value="admin">Admin (Manage Team & Projects)</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top: 16px;">
+              <button id="submitAddMemberBtn" class="btn btn-primary" type="button">
+                + Add Team Member
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         DEDICATED PAGE: SUPERADMIN PORTAL (/admin)
+         ==================================================================== -->
+    <section id="tab-admin" class="tab-content" data-route="/admin">
+      <!-- Distinct Page Header -->
+      <div class="page-header accent-rose">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">PLATFORM ROOT CONTROL</span>
+            <span class="badge badge-warning">Superadmin</span>
+          </div>
+          <div class="page-header-title">
+            <span>🏢</span> Platform Superadmin Control Portal
+          </div>
+          <div class="page-header-subtitle">
+            Global multi-tenant governance, customer tenant provisioning, resource quotas, and platform fleet telemetry.
+          </div>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary btn-sm" type="button" onclick="loadSuperadminDashboard()">
+            ↻ Refresh Overview
+          </button>
+        </div>
+      </div>
+
+      <!-- Sub Navigation Bar -->
+      <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+        <button class="btn btn-sm btn-primary active" data-admin-tab="overview">📊 Platform Overview & Tenants</button>
+        <button class="btn btn-sm btn-dark" data-admin-tab="onboard">➕ Onboard New Organization</button>
+      </div>
+
+      <!-- Admin Tab 1: Overview -->
+      <div id="adminTabOverview">
+        <div class="grid grid-4" style="gap: 14px; margin-bottom: 22px;">
+          <div class="kpi-card" style="padding: 16px;">
+            <div class="kpi-label">Total Organizations</div>
+            <div class="kpi-value text-primary" id="adminTotalOrgs">0</div>
+          </div>
+          <div class="kpi-card" style="padding: 16px;">
+            <div class="kpi-label">Active Users</div>
+            <div class="kpi-value text-info" id="adminTotalUsers">0</div>
+          </div>
+          <div class="kpi-card" style="padding: 16px;">
+            <div class="kpi-label">Global Projects</div>
+            <div class="kpi-value" id="adminTotalProjects">0</div>
+          </div>
+          <div class="kpi-card" style="padding: 16px;">
+            <div class="kpi-label">Total Test Runs</div>
+            <div class="kpi-value text-success" id="adminTotalRuns">0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Customer Tenant Organizations</div>
+            <span class="badge badge-primary">Live Multi-Tenant DB</span>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div style="overflow-x: auto;">
+              <table class="table" style="width: 100%; margin: 0;" id="adminOrgsTable">
+                <thead>
+                  <tr>
+                    <th>Organization</th>
+                    <th>Plan Tier</th>
+                    <th>Max VUs</th>
+                    <th>Projects</th>
+                    <th>Members</th>
+                    <th>Test Runs</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="adminOrgsTableBody">
+                  <!-- Injected via JavaScript -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Tab 2: Onboard -->
+      <div id="adminTabOnboard" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Provision New Organization & Initial Admin</div>
+          </div>
+          <div class="card-body">
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+              Provision a new B2B tenant organization, set resource quotas, and assign the initial Org Admin account.
+            </div>
+
+            <div class="grid grid-2" style="gap: 16px;">
+              <div class="input-group">
+                <label for="onboardOrgName">Organization Name *</label>
+                <input type="text" id="onboardOrgName" placeholder="e.g. Stripe Payments QA" />
+              </div>
+              <div class="input-group">
+                <label for="onboardOrgSlug">Organization Slug *</label>
+                <input type="text" id="onboardOrgSlug" placeholder="e.g. stripe-payments" />
+              </div>
+            </div>
+
+            <div class="grid grid-3" style="gap: 16px; margin-top: 10px;">
+              <div class="input-group">
+                <label for="onboardPlanTier">Subscription Tier</label>
+                <select id="onboardPlanTier">
+                  <option value="starter">Starter (Free, 50 VUs)</option>
+                  <option value="team" selected>Team ($149/mo, 200 VUs)</option>
+                  <option value="enterprise">Enterprise ($999/mo, 1000 VUs)</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label for="onboardMaxVus">Max Concurrent VUs</label>
+                <input type="number" id="onboardMaxVus" value="200" />
+              </div>
+              <div class="input-group">
+                <label for="onboardMaxProjects">Max Projects</label>
+                <input type="number" id="onboardMaxProjects" value="10" />
+              </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 14px;">
+              <div style="font-size: 14px; font-weight: 700; margin-bottom: 10px;">Initial Org Admin Account</div>
+              <div class="grid grid-3" style="gap: 16px;">
+                <div class="input-group">
+                  <label for="onboardAdminName">Admin Full Name *</label>
+                  <input type="text" id="onboardAdminName" placeholder="e.g. Sarah Connor" />
+                </div>
+                <div class="input-group">
+                  <label for="onboardAdminEmail">Admin Email *</label>
+                  <input type="email" id="onboardAdminEmail" placeholder="admin@client.com" />
+                </div>
+                <div class="input-group">
+                  <label for="onboardAdminPassword">Temporary Password *</label>
+                  <input type="password" id="onboardAdminPassword" value="Password@123" />
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+              <button id="submitOnboardOrgBtn" class="btn btn-primary btn-lg" type="button">
+                🚀 Provision Organization
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <!-- Live Telemetry Footer Bar -->
+  <footer class="stitch-footer">
+    <div>k6 & Allure Performance Studio • High-Concurrency Spec-to-Load Benchmark Platform</div>
+    <div style="display: flex; gap: 16px;">
+      <span>Engine: <strong class="text-primary">k6 Go v0.48+</strong></span>
+      <span>Contract: <strong class="text-info">Schemathesis</strong></span>
+      <span>Storage: <strong class="text-success">PostgreSQL</strong></span>
+    </div>
+  </footer>
+</div><!-- /.app-main-panel -->
+</div><!-- /.app-layout -->
 
   <!-- ====================================================================
        ENDPOINT SCENARIO & PAYLOAD MODAL
@@ -1306,282 +1910,7 @@
     </div>
   </div>
 
-  <!-- ====================================================================
-       SAAS MODAL 1: CREATE NEW PROJECT & STARTER KIT PICKER
-       ==================================================================== -->
-  <div class="modal-overlay hidden" id="newProjectModal">
-    <div class="modal-card modal-card-lg">
-      <div class="modal-header">
-        <div class="modal-title">📁 Create New Performance Testing Project</div>
-        <button id="closeNewProjectModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
-      </div>
-      <div class="modal-body">
-        <div style="font-size: 13px; color: var(--text-muted);">
-          Projects isolate your OpenAPI specifications, load scenarios, parameterization datasets, and SLA regression history.
-        </div>
-
-        <div class="grid grid-2" style="gap: 16px;">
-          <div class="input-group">
-            <label for="newProjectName">Project Name *</label>
-            <input type="text" id="newProjectName" placeholder="e.g. Payments Gateway API" />
-          </div>
-          <div class="input-group">
-            <label for="newProjectSlug">Project Slug (URL Safe) *</label>
-            <input type="text" id="newProjectSlug" placeholder="e.g. payments-gateway-api" />
-          </div>
-        </div>
-
-        <div class="input-group">
-          <label for="newProjectDesc">Description (Optional)</label>
-          <input type="text" id="newProjectDesc" placeholder="e.g. Core transactional microservice with PCI-compliant tokenization" />
-        </div>
-
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 700;">Choose Initialization Template</label>
-          <div class="template-cards-grid" id="templateCardsGrid">
-            <!-- Rendered dynamically by app.js -->
-            <div class="template-card active" data-template-id="minimal-rest-api">
-              <div class="template-card-header">
-                <span class="template-card-title">Minimal REST Service (CRUD)</span>
-                <span class="template-card-badge">REST</span>
-              </div>
-              <div class="template-card-desc">
-                Pre-configured OpenAPI 3.0.3 spec with Items & Orders CRUD endpoints and staging targets.
-              </div>
-              <div class="template-card-features">
-                <span class="template-pill">OpenAPI 3.0.3</span>
-                <span class="template-pill">Dev / Staging</span>
-                <span class="template-pill">Zero Code</span>
-              </div>
-            </div>
-
-            <div class="template-card" data-template-id="spring-boot-ecommerce">
-              <div class="template-card-header">
-                <span class="template-card-title">Spring Boot E-Commerce API</span>
-                <span class="template-card-badge">Full Spec</span>
-              </div>
-              <div class="template-card-desc">
-                Production-grade store with Catalog, Cart, Checkout, Auth tokens, and sample-users CSV dataset.
-              </div>
-              <div class="template-card-features">
-                <span class="template-pill">Catalog & Cart</span>
-                <span class="template-pill">CSV Dataset</span>
-                <span class="template-pill">Auth Tokens</span>
-              </div>
-            </div>
-
-            <div class="template-card" data-template-id="blank">
-              <div class="template-card-header">
-                <span class="template-card-title">Blank Project</span>
-                <span class="template-card-badge">Custom</span>
-              </div>
-              <div class="template-card-desc">
-                Start from scratch. You will upload your own custom OpenAPI/Swagger JSON spec or fetch from URL.
-              </div>
-              <div class="template-card-features">
-                <span class="template-pill">Custom Upload</span>
-                <span class="template-pill">Any Spec</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="cancelNewProjectBtn" class="btn btn-dark" type="button">Cancel</button>
-        <button id="submitNewProjectBtn" class="btn btn-primary" type="button">⚡ Create Project</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ====================================================================
-       SAAS MODAL 2: PLATFORM SUPERADMIN CONTROL PORTAL
-       ==================================================================== -->
-  <div class="modal-overlay hidden" id="superadminModal">
-    <div class="modal-card modal-card-lg">
-      <div class="modal-header">
-        <div class="modal-title">🏢 Platform Superadmin Control Portal</div>
-        <button id="closeSuperadminModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-sub-nav">
-          <button class="modal-sub-tab active" data-admin-tab="overview">📊 Platform Overview & Tenants</button>
-          <button class="modal-sub-tab" data-admin-tab="onboard">➕ Onboard New Organization</button>
-        </div>
-
-        <!-- Admin Tab 1: Overview -->
-        <div id="adminTabOverview">
-          <div class="grid grid-4" style="gap: 12px; margin-bottom: 20px;">
-            <div class="kpi-card" style="padding: 14px;">
-              <div class="kpi-label">Total Organizations</div>
-              <div class="kpi-value text-primary" id="adminTotalOrgs">0</div>
-            </div>
-            <div class="kpi-card" style="padding: 14px;">
-              <div class="kpi-label">Active Users</div>
-              <div class="kpi-value text-info" id="adminTotalUsers">0</div>
-            </div>
-            <div class="kpi-card" style="padding: 14px;">
-              <div class="kpi-label">Global Projects</div>
-              <div class="kpi-value" id="adminTotalProjects">0</div>
-            </div>
-            <div class="kpi-card" style="padding: 14px;">
-              <div class="kpi-label">Total Test Runs</div>
-              <div class="kpi-value text-success" id="adminTotalRuns">0</div>
-            </div>
-          </div>
-
-          <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Customer Tenant Organizations</div>
-          <div style="overflow-x: auto;">
-            <table class="table" style="width: 100%;" id="adminOrgsTable">
-              <thead>
-                <tr>
-                  <th>Organization</th>
-                  <th>Plan Tier</th>
-                  <th>Max VUs</th>
-                  <th>Projects</th>
-                  <th>Members</th>
-                  <th>Test Runs</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody id="adminOrgsTableBody">
-                <!-- Injected via JavaScript -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Admin Tab 2: Onboard -->
-        <div id="adminTabOnboard" class="hidden">
-          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-            Provision a new B2B tenant organization, set resource quotas, and assign the initial Org Admin account.
-          </div>
-
-          <div class="grid grid-2" style="gap: 14px;">
-            <div class="input-group">
-              <label for="onboardOrgName">Organization Name *</label>
-              <input type="text" id="onboardOrgName" placeholder="e.g. Stripe Payments QA" />
-            </div>
-            <div class="input-group">
-              <label for="onboardOrgSlug">Organization Slug *</label>
-              <input type="text" id="onboardOrgSlug" placeholder="e.g. stripe-payments" />
-            </div>
-          </div>
-
-          <div class="grid grid-3" style="gap: 14px;">
-            <div class="input-group">
-              <label for="onboardPlanTier">Subscription Tier</label>
-              <select id="onboardPlanTier">
-                <option value="starter">Starter (Free, 50 VUs)</option>
-                <option value="team" selected>Team ($149/mo, 200 VUs)</option>
-                <option value="enterprise">Enterprise ($999/mo, 1000 VUs)</option>
-              </select>
-            </div>
-            <div class="input-group">
-              <label for="onboardMaxVus">Max Concurrent VUs</label>
-              <input type="number" id="onboardMaxVus" value="200" />
-            </div>
-            <div class="input-group">
-              <label for="onboardMaxProjects">Max Projects</label>
-              <input type="number" id="onboardMaxProjects" value="10" />
-            </div>
-          </div>
-
-          <div style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px;">
-            <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Initial Org Admin Account</div>
-            <div class="grid grid-3" style="gap: 14px;">
-              <div class="input-group">
-                <label for="onboardAdminName">Admin Full Name *</label>
-                <input type="text" id="onboardAdminName" placeholder="e.g. Sarah Connor" />
-              </div>
-              <div class="input-group">
-                <label for="onboardAdminEmail">Admin Email *</label>
-                <input type="email" id="onboardAdminEmail" placeholder="admin@client.com" />
-              </div>
-              <div class="input-group">
-                <label for="onboardAdminPassword">Temporary Password *</label>
-                <input type="password" id="onboardAdminPassword" value="Password@123" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="closeSuperadminPortalBtn" class="btn btn-dark" type="button">Close</button>
-        <button id="submitOnboardOrgBtn" class="btn btn-primary hidden" type="button">🚀 Provision Organization</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ====================================================================
-       SAAS MODAL 3: TEAM & RBAC MANAGEMENT
-       ==================================================================== -->
-  <div class="modal-overlay hidden" id="teamModal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div class="modal-title">👥 Team Members & Access Roles</div>
-        <button id="closeTeamModalBtn" class="btn btn-dark btn-sm" type="button">✕</button>
-      </div>
-      <div class="modal-body">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-size: 14px; font-weight: 700;" id="teamOrgName">Acme Corporation</div>
-            <div style="font-size: 11px; color: var(--text-muted);" id="teamOrgPlan">Plan: Team • Quota: 200 VUs</div>
-          </div>
-          <span class="plan-badge plan-team" id="teamPlanBadge">TEAM</span>
-        </div>
-
-        <div style="margin-top: 10px;">
-          <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px;">Active Members</div>
-          <table class="table" style="width: 100%;">
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Email</th>
-                <th>Role</th>
-              </tr>
-            </thead>
-            <tbody id="teamMembersTableBody">
-              <!-- Rendered via JS -->
-            </tbody>
-          </table>
-        </div>
-
-        <div style="border-top: 1px solid var(--border); padding-top: 14px;">
-          <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Add New Team Member</div>
-          <div class="grid grid-2" style="gap: 12px;">
-            <div class="input-group">
-              <label for="newMemberName">Full Name</label>
-              <input type="text" id="newMemberName" placeholder="e.g. John Doe" />
-            </div>
-            <div class="input-group">
-              <label for="newMemberEmail">Email Address</label>
-              <input type="email" id="newMemberEmail" placeholder="john@company.com" />
-            </div>
-          </div>
-          <div class="grid grid-2" style="gap: 12px; margin-top: 8px;">
-            <div class="input-group">
-              <label for="newMemberPassword">Temporary Password</label>
-              <input type="password" id="newMemberPassword" value="Password@123" />
-            </div>
-            <div class="input-group">
-              <label for="newMemberRole">Access Role</label>
-              <select id="newMemberRole">
-                <option value="developer" selected>Developer (Run Tests, Edit Scenarios)</option>
-                <option value="viewer">Viewer (View Reports & Analytics)</option>
-                <option value="admin">Admin (Manage Team & Projects)</option>
-              </select>
-            </div>
-          </div>
-          <button id="submitAddMemberBtn" class="btn btn-secondary btn-sm" style="margin-top: 10px;" type="button">
-            + Add Member
-          </button>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="closeTeamModalFooterBtn" class="btn btn-dark" type="button">Done</button>
-      </div>
-    </div>
-  </div>
+  <!-- Modals that are now dedicated pages: /projects, /admin, /team (handlers route automatically) -->
 
   <!-- ====================================================================
        SAAS MODAL 4: AUTHENTICATION & SESSION SWITCHER
