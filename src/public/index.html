@@ -143,10 +143,11 @@
          TAB 1: SAAS PLATFORM OVERVIEW & PRODUCT LANDING PAGE
          ==================================================================== -->
     <section id="tab-overview" class="tab-content active">
-      <div class="landing-container">
+      <div class="landing-container grid-bg">
 
-        <!-- Hero Banner -->
-        <div class="landing-hero">
+        <!-- Hero Banner with Stitch Precision Corner Line -->
+        <div class="landing-hero" style="position: relative; overflow: hidden;">
+          <div class="hero-accent-corner"></div>
           <div class="landing-pill">
             <span>✨ Spec-First API Reliability Platform</span>
             <span>•</span>
@@ -201,6 +202,30 @@
           </div>
         </div>
 
+        <!-- Embedded Interactive Sandbox Card on the Landing Page -->
+        <div class="stitch-sandbox-banner">
+          <div class="stitch-sandbox-info">
+            <div class="stitch-sandbox-tag">
+              <span class="badge badge-success" id="landingMockBadge">Mock API Active (Port 8080)</span>
+              <span style="color: var(--text-muted); font-size: 11px;">Instant Interactive Sandbox Engine</span>
+            </div>
+            <div class="stitch-sandbox-meta">
+              <span>Target: <strong class="stitch-sandbox-target">http://localhost:8080 (Spring Boot Core API)</strong></span>
+              <span>• Profile: <strong>10 VUs Ramp (10s)</strong></span>
+              <span>• SLA: <strong>P95 &lt; 500ms</strong></span>
+              <span>• Circuit-Breaker: <strong class="text-danger">Stop on 10 Failures</strong></span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button id="runDemoBenchmarkBtn" class="btn btn-primary btn-lg" type="button">
+              ⚡ Run Demo Benchmark (1-Click)
+            </button>
+            <button class="btn btn-secondary btn-lg" type="button" onclick="switchTab('studio')">
+              Open Full Real Studio →
+            </button>
+          </div>
+        </div>
+
         <!-- Product Suite Grid Showcase -->
         <div>
           <div class="product-section-header">
@@ -213,180 +238,207 @@
           <div class="product-grid">
 
             <!-- Product 1: Test Your API Under Load -->
-            <div class="product-card">
+            <div class="product-card" onclick="switchTab('studio')">
               <div class="product-card-top">
                 <div class="product-card-header">
                   <span class="product-icon">⚡</span>
-                  <span class="product-tag product-tag-core">Load Testing</span>
+                  <span class="product-tag product-tag-core">SPEC-TO-K6</span>
                 </div>
                 <h3 class="product-title">Test Your API Under Loads</h3>
                 <p class="product-desc">
-                  Convert any OpenAPI 3.x or Swagger spec into production-grade k6 scripts. Ramp up virtual users, feed dynamic datasets, and benchmark response times under real-world concurrency.
+                  Spec-to-k6 Engine & Autonomous Test Generation. Convert OpenAPI 3.x/Swagger specs into production-grade k6 scripts.
                 </p>
                 <ul class="product-features-list">
-                  <li>Spec-to-k6 automatic compilation with parameterization</li>
+                  <li>OpenAPI 3.0/3.1 auto-sync with dynamic endpoint schema discovery</li>
                   <li>Multi-stage ramps (Smoke, Load, Stress, Soak testing)</li>
-                  <li>Dynamic variable replacement (UUID, timestamps, emails)</li>
+                  <li>Dynamic CSV/JSON payload feeders with randomized permutations</li>
                   <li>Sub-millisecond P90, P95, and P99 latency SLA checks</li>
                 </ul>
               </div>
-              <button class="btn btn-primary product-action-btn" type="button" onclick="switchTab('studio')">
-                Launch Test Studio →
-              </button>
+              <div class="product-card-footer">
+                <span class="product-card-mono-tag">AUTONOMIC K6 V0.48+</span>
+                <span class="product-card-arrow-link">Launch Studio →</span>
+              </div>
             </div>
 
             <!-- Product 2: Setup Cron Automated Benchmarks -->
-            <div class="product-card">
+            <div class="product-card" onclick="switchTab('schedules')">
               <div class="product-card-top">
                 <div class="product-card-header">
                   <span class="product-icon">⏰</span>
-                  <span class="product-tag product-tag-cron">Automation</span>
+                  <span class="product-tag product-tag-cron">AUTOMATION</span>
                 </div>
                 <h3 class="product-title">Setup Cron Benchmarks</h3>
                 <p class="product-desc">
-                  Continuously guard your services against silent performance degradation. Schedule benchmarks hourly, nightly, or on custom cron expressions with zero human intervention.
+                  Autonomous Recurring Load Schedules. Guard your services against silent performance regressions with zero human intervention.
                 </p>
                 <ul class="product-features-list">
-                  <li>Standard 5-field cron scheduling (e.g. nightly at 2 AM)</li>
+                  <li>Standard 5-field cron syntax parser (e.g. 0 2 * * * nightly)</li>
                   <li>Multi-environment execution (Staging, Pre-prod, Production)</li>
-                  <li>Automatic historical trend logging into PostgreSQL</li>
+                  <li>Automated baseline drift detection logged to PostgreSQL</li>
                   <li>1-click manual trigger and instant pause/resume controls</li>
                 </ul>
               </div>
-              <button class="btn btn-dark product-action-btn" type="button" onclick="switchTab('schedules')">
-                Setup Cron Schedules →
-              </button>
+              <div class="product-card-footer">
+                <span class="product-card-mono-tag">SCHEDULER ENGINE</span>
+                <span class="product-card-arrow-link">Configure Schedules →</span>
+              </div>
             </div>
 
             <!-- Product 3: Alarm on Failure & Stop Circuit-Breaker -->
-            <div class="product-card">
+            <div class="product-card" onclick="switchTab('alarms')">
               <div class="product-card-top">
                 <div class="product-card-header">
                   <span class="product-icon">🛑</span>
-                  <span class="product-tag product-tag-alarm">Reliability</span>
+                  <span class="product-tag product-tag-alarm">CIRCUIT BREAKER</span>
                 </div>
                 <h3 class="product-title">Alarm on Failure & Circuit Breaker</h3>
                 <p class="product-desc">
-                  Protect downstream servers from denial-of-service and runaway cloud bills. Automatically abort benchmarks when server errors breach your threshold, and dispatch instant alerts.
+                  Microservice Protection Engine. Abort k6 benchmarks when error counts breach safety threshold to avoid cascading downtime.
                 </p>
                 <ul class="product-features-list">
-                  <li>Auto-stop benchmark when failure count exceeds N errors</li>
-                  <li>Instant alert webhooks to Slack, Microsoft Teams, Discord</li>
+                  <li>Auto-stop benchmark when cumulative HTTP failures reach limit</li>
+                  <li>Enforces native k6 abortOnFail threshold to save cloud costs</li>
+                  <li>Instant webhook alerts to Slack, Microsoft Teams, Discord</li>
                   <li>Configurable SLA breach gatekeeper policies</li>
-                  <li>Payload diagnostics with reproduction cURL commands</li>
                 </ul>
               </div>
-              <button class="btn btn-secondary product-action-btn" type="button" onclick="switchTab('alarms')">
-                Configure Failure Alarms →
-              </button>
+              <div class="product-card-footer">
+                <span class="product-card-mono-tag">FAIL-SAFE GUARD</span>
+                <span class="product-card-arrow-link">Manage Alarms →</span>
+              </div>
             </div>
 
             <!-- Product 4: Distributed APM Tracing -->
-            <div class="product-card">
+            <div class="product-card" onclick="switchTab('managementReport')">
               <div class="product-card-top">
                 <div class="product-card-header">
                   <span class="product-icon">🔍</span>
-                  <span class="product-tag product-tag-apm">Observability</span>
+                  <span class="product-tag product-tag-apm">TELEMETRY</span>
                 </div>
                 <h3 class="product-title">Distributed APM Tracing</h3>
                 <p class="product-desc">
-                  Connect high-volume load test requests directly to backend microservice waterfalls. Injects standard W3C traceparent headers to correlate k6 spikes with Jaeger, Zipkin, and Datadog.
+                  OpenTelemetry & W3C Trace Context. Connect high-volume load test requests directly to backend microservice waterfalls.
                 </p>
                 <ul class="product-features-list">
-                  <li>W3C Trace Context (traceparent, baggage, X-Trace-Id)</li>
-                  <li>Downstream propagation across Spring Boot, Node, Go, K8s</li>
-                  <li>Automatic sample trace recording saved in PostgreSQL</li>
-                  <li>Direct 1-click links opening span waterfalls in your APM</li>
+                  <li>Automatic traceparent header injection per virtual user request</li>
+                  <li>Native correlation into Jaeger, Grafana Tempo, and Datadog</li>
+                  <li>Trace waterfall latency inspector mapped directly to endpoints</li>
+                  <li>Pinpoint downstream microservice bottlenecks and DB locks</li>
                 </ul>
               </div>
-              <button class="btn btn-secondary product-action-btn" type="button" onclick="switchTab('managementReport')">
-                View Tracing & APM →
-              </button>
+              <div class="product-card-footer">
+                <span class="product-card-mono-tag">OTEL COMPLIANT</span>
+                <span class="product-card-arrow-link">Explore Tracing →</span>
+              </div>
             </div>
 
             <!-- Product 5: Executive & Allure Reports -->
-            <div class="product-card">
+            <div class="product-card" onclick="switchTab('managementReport')">
               <div class="product-card-top">
                 <div class="product-card-header">
                   <span class="product-icon">📊</span>
-                  <span class="product-tag product-tag-report">Reporting</span>
+                  <span class="product-tag product-tag-report">REPORTING</span>
                 </div>
                 <h3 class="product-title">Executive & Allure 2 Reports</h3>
                 <p class="product-desc">
-                  Deliver clear, stakeholder-ready results. Instant executive HTML reports with SLA pass/fail verdicts, latency percentiles, and deep Allure 2 interactive defect classifications.
+                  Stakeholder Analytics & Compliance. Instant executive HTML reports with SLA pass/fail verdicts and deep Allure 2 test suites.
                 </p>
                 <ul class="product-features-list">
                   <li>Executive KPI summary cards and SLA compliance matrix</li>
-                  <li>Interactive latency percentile charts (avg, med, p95, p99)</li>
+                  <li>Granular p50, p90, p95, p99 percentile latency breakdowns</li>
                   <li>Allure 2 test suites with categorized failure analysis</li>
                   <li>Tenant-scoped archive with printable PDF export</li>
                 </ul>
               </div>
-              <button class="btn btn-secondary product-action-btn" type="button" onclick="switchTab('managementReport')">
-                Explore Reports Center →
-              </button>
+              <div class="product-card-footer">
+                <span class="product-card-mono-tag">ALLURE 2.24</span>
+                <span class="product-card-arrow-link">Explore Reports →</span>
+              </div>
             </div>
 
-            <!-- Product 6: Multi-Tenant Workspace & RBAC -->
-            <div class="product-card">
+            <!-- Product 6: Multi-Tenant Architecture & RBAC -->
+            <div class="product-card" onclick="document.getElementById('openTeamBtn')?.click()">
               <div class="product-card-top">
                 <div class="product-card-header">
                   <span class="product-icon">🏢</span>
-                  <span class="product-tag product-tag-core">Platform</span>
+                  <span class="product-tag product-tag-core">ENTERPRISE RBAC</span>
                 </div>
                 <h3 class="product-title">Multi-Tenant Architecture & RBAC</h3>
                 <p class="product-desc">
-                  Enterprise multi-tenancy built from the ground up. Isolate organizations, projects, API keys, and test artifacts with role-based access control and PostgreSQL tenancy.
+                  Enterprise Security & Isolation. Isolate organizations, projects, API keys, and test artifacts with role-based access control.
                 </p>
                 <ul class="product-features-list">
-                  <li>Strict tenant isolation for runs, specs, datasets, and logs</li>
-                  <li>Role-based access control (Admin, Developer, Viewer)</li>
+                  <li>Strict workspace data isolation per enterprise tenant organization</li>
+                  <li>Granular RBAC privileges: Viewer, Runner, Developer, and Admin</li>
+                  <li>Persistent PostgreSQL storage with encrypted tokens</li>
                   <li>Superadmin control plane with organization onboarding</li>
-                  <li>Enterprise starter kits for instant project bootstrapping</li>
                 </ul>
               </div>
-              <button class="btn btn-secondary product-action-btn" type="button" onclick="document.getElementById('openTeamBtn')?.click()">
-                Manage Organization Team →
-              </button>
+              <div class="product-card-footer">
+                <span class="product-card-mono-tag">RBAC + AUDIT</span>
+                <span class="product-card-arrow-link">Manage Access →</span>
+              </div>
             </div>
 
           </div>
         </div>
 
-        <!-- Embedded Interactive Sandbox Card on the Landing Page -->
-        <div class="card" style="margin-top: 10px;">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Interactive 1-Click Sandbox Environment</div>
-              <div style="font-size: 12px; color: var(--text-muted);">
-                Test the complete pipeline right here without importing your own specs. Runs against the built-in Spring Boot mock API server.
-              </div>
+        <!-- Active Cluster Engine Pulse Section (Stitch Live Telemetry Strip) -->
+        <div class="cluster-pulse-section">
+          <div class="cluster-pulse-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="status-dot active" style="width: 8px; height: 8px;"></span>
+              <strong style="font-size: 14px; color: var(--text);">Active Engine Pulse & Resource Telemetry</strong>
+              <span class="badge" style="font-family: var(--font-mono); font-size: 10px;">CLUSTER_LOCAL_01</span>
             </div>
-            <span class="badge badge-success" id="landingMockBadge">Mock API Active</span>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+              Sampling: <span class="text-primary font-bold">100ms</span> | Engine Load: <span class="text-success font-bold">Normal</span>
+            </div>
           </div>
-          <div class="card-body">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
-              <div style="padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
-                <div style="font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px;">Target Service</div>
-                <div style="font-family: var(--font-mono); font-size: 12px; color: var(--primary);">http://localhost:8080 (Spring Boot Core API)</div>
-              </div>
-              <div style="padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
-                <div style="font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px;">Test Profile</div>
-                <div style="font-size: 12px; color: var(--text);">10 VUs Ramp (10s) • P95 &lt; 500ms • Stop on 10 Failures</div>
-              </div>
-              <div style="padding: 12px; background-color: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius);">
-                <div style="font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px;">Included Endpoints</div>
-                <div style="font-size: 12px; color: var(--text);">/products, /orders, /auth/login, /health</div>
+          <div class="cluster-pulse-grid">
+            <div class="cluster-metric-card">
+              <span class="cluster-metric-label">Max Concurrency Headroom</span>
+              <div class="cluster-metric-val">10,000 <span style="font-size: 12px; color: var(--primary); font-weight: normal;">VUs</span></div>
+              <div class="cluster-progress-bar-bg">
+                <div class="cluster-progress-bar-fill" style="width: 25%; background-color: var(--primary);"></div>
               </div>
             </div>
-            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-              <button id="runDemoBenchmarkBtn" class="btn btn-primary btn-lg" type="button">
-                ⚡ Run Demo Benchmark (1-Click)
-              </button>
-              <button class="btn btn-secondary btn-lg" type="button" onclick="switchTab('studio')">
-                Open Full Real Studio →
-              </button>
+            <div class="cluster-metric-card">
+              <span class="cluster-metric-label">Target Latency SLA (P95)</span>
+              <div class="cluster-metric-val">&lt; 500 <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">ms</span></div>
+              <div class="cluster-progress-bar-bg">
+                <div class="cluster-progress-bar-fill" style="width: 40%; background-color: var(--success);"></div>
+              </div>
             </div>
+            <div class="cluster-metric-card">
+              <span class="cluster-metric-label">Execution Engine</span>
+              <div class="cluster-metric-val">k6 Go <span style="font-size: 12px; color: var(--primary); font-weight: normal;">v0.48+</span></div>
+              <div class="cluster-progress-bar-bg">
+                <div class="cluster-progress-bar-fill" style="width: 100%; background-color: var(--primary);"></div>
+              </div>
+            </div>
+            <div class="cluster-metric-card">
+              <span class="cluster-metric-label">Circuit-Breaker Status</span>
+              <div class="cluster-metric-val" style="color: var(--success);">ARMED <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Auto-Halt)</span></div>
+              <div class="cluster-progress-bar-bg">
+                <div class="cluster-progress-bar-fill" style="width: 100%; background-color: var(--success);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Telemetry Footer Bar -->
+        <div class="stitch-footer">
+          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <span><span class="status-dot active"></span> OpenTelemetry Collector: Healthy</span>
+            <span>|</span>
+            <span>Prometheus k6 Exporter: Active</span>
+            <span>|</span>
+            <span>Storage: PostgreSQL 16 (SSL)</span>
+          </div>
+          <div>
+            <span class="text-primary font-bold">k6 & Allure Performance Studio • Enterprise Edition</span>
           </div>
         </div>
 
