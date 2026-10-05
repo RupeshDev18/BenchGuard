@@ -2867,23 +2867,202 @@ canvas {
 /* -------------------------------------------------------------
    Responsive Breakpoints
    ------------------------------------------------------------- */
-@media (max-width: 1024px) {
-  .app-sidebar {
-    position: fixed;
-    left: -270px;
-    z-index: 100;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.25);
-  }
-  .app-sidebar.mobile-open {
-    left: 0;
-  }
-  .mobile-menu-btn {
-    display: flex;
-  }
-  .topbar-workspace-switcher {
-    display: none;
-  }
+/* -------------------------------------------------------------
+   Phase 2: Fleet Telemetry HUD & Circuit Breaker Emergency Banner
+   ------------------------------------------------------------- */
+.circuit-breaker-emergency-banner {
+  background-color: rgba(239, 68, 68, 0.12);
+  border: 1px solid #EF4444;
+  border-left: 4px solid #EF4444;
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: pulseEmergency 2s infinite;
 }
+
+@keyframes pulseEmergency {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.emergency-banner-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.emergency-banner-content {
+  flex: 1;
+}
+
+.emergency-banner-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #EF4444;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.emergency-banner-subtitle {
+  font-size: 12px;
+  color: var(--text);
+  margin-top: 2px;
+}
+
+.emergency-banner-meta {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.fleet-telemetry-hud {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fleet-hud-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.fleet-kpi-item {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.fleet-kpi-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.fleet-kpi-value {
+  font-size: 20px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text);
+  margin: 4px 0 2px;
+}
+
+.fleet-kpi-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.circuit-meter-wrapper {
+  width: 100%;
+  height: 6px;
+  background-color: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 6px 0 4px;
+  border: 1px solid var(--border);
+}
+
+.circuit-meter-fill {
+  height: 100%;
+  background-color: #10B981;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.circuit-meter-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.fleet-workers-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.worker-hud-card {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s ease;
+}
+
+.worker-hud-card.active {
+  border-color: var(--primary);
+}
+
+.worker-hud-card.halted {
+  border-color: #EF4444;
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.worker-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.worker-card-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.worker-card-segment {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text-muted);
+}
+
+.worker-card-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.worker-card-errors {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.worker-card-errors.has-errors {
+  color: #EF4444;
+}
+
 
 
 

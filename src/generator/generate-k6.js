@@ -247,14 +247,15 @@ const maxError = th.maxErrorRate ?? 0.01;
 const maxFailuresToStop = th.maxFailuresToStop || config.maxFailuresToStop || null;
 
 const failedRules = [`"rate<${maxError}"`];
-if (maxFailuresToStop && Number(maxFailuresToStop) > 0) {
-  failedRules.push(`{ threshold: "count<${Number(maxFailuresToStop)}", abortOnFail: true }`);
-}
 
 const thresholdRules = [
   `"http_req_duration": ["p(95)<${p95}", "p(99)<${p99}"]`,
   `"http_req_failed": [${failedRules.join(", ")}]`,
 ];
+
+if (maxFailuresToStop && Number(maxFailuresToStop) > 0) {
+  thresholdRules.push(`"failure_count": [{ threshold: "count<${Number(maxFailuresToStop)}", abortOnFail: true }]`);
+}
 
 for (const ep of endpoints) {
   thresholdRules.push(`"http_req_duration{endpoint:${ep.opId}}": ["p(95)<${p95 * 1.5}"]`);
@@ -321,10 +322,13 @@ const requestStatements = endpoints
   group("${ep.tag} - ${ep.opId}", function () {
 ${traceSetup}
     const res = http.${ep.method.toLowerCase()}(${urlExpr}, ${paramsExpr});
-    check(res, {
+    const passed = check(res, {
       "${ep.opId} status in ${statusCheckList}": (r) => ${statusCheckExpr},
       "${ep.opId} p95 SLA acceptable": (r) => r.timings.duration < ${p95 * 2}
     });
+    if (!passed || res.status >= 400) {
+      failureCount.add(1);
+    }
   });`;
     }
 
@@ -335,10 +339,13 @@ ${traceSetup}
     const rawPayload = ${payloadTemplate};
     const resolvedPayload = resolveDynamicValues(rawPayload, currentUser);
     const res = http.${ep.method.toLowerCase()}(${urlExpr}, JSON.stringify(resolvedPayload), ${paramsExpr});
-    check(res, {
+    const passed = check(res, {
       "${ep.opId} status in ${statusCheckList}": (r) => ${statusCheckExpr},
       "${ep.opId} p95 SLA acceptable": (r) => r.timings.duration < ${p95 * 2}
     });
+    if (!passed || res.status >= 400) {
+      failureCount.add(1);
+    }
   });`;
   })
   .join("\n\n");
@@ -382,7 +389,10 @@ const scriptContent = `// ======================================================
 
 import http from "k6/http";
 import { check, group, sleep } from "k6";
+import { Counter } from "k6/metrics";
 ${datasetSnippet}
+
+export const failureCount = new Counter("failure_count");
 
 const BASE_URL = "${baseUrl}";
 const HEADERS = ${headersJson};

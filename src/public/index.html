@@ -1195,6 +1195,52 @@
         </div>
       </div>
 
+      <!-- Emergency Circuit Breaker Tripped Banner -->
+      <div id="circuitBreakerTrippedBanner" class="circuit-breaker-emergency-banner hidden">
+        <div class="emergency-banner-icon">🛑</div>
+        <div class="emergency-banner-content">
+          <div class="emergency-banner-title">CIRCUIT BREAKER TRIPPED — FLEET EXECUTION HALTED</div>
+          <div class="emergency-banner-subtitle" id="circuitBreakerTrippedSubtitle">
+            Cumulative HTTP failures breached the configured safety limit. All distributed workers were halted in parallel.
+          </div>
+          <div class="emergency-banner-meta" id="circuitBreakerTrippedMeta"></div>
+        </div>
+      </div>
+
+      <!-- Fleet Telemetry HUD -->
+      <div class="fleet-telemetry-hud" id="fleetTelemetryHud">
+        <div class="fleet-hud-summary">
+          <div class="fleet-kpi-item">
+            <div class="fleet-kpi-label">ACTIVE WORKER FLEET</div>
+            <div class="fleet-kpi-value text-primary" id="hudActiveWorkers">1 Node</div>
+            <div class="fleet-kpi-sub" id="hudWorkersSub">Local Engine</div>
+          </div>
+          <div class="fleet-kpi-item">
+            <div class="fleet-kpi-label">CONCURRENCY HEADROOM</div>
+            <div class="fleet-kpi-value text-info" id="hudTotalVus">0 VUs</div>
+            <div class="fleet-kpi-sub" id="hudVusSub">Active across cluster</div>
+          </div>
+          <div class="fleet-kpi-item">
+            <div class="fleet-kpi-label">AGGREGATED THROUGHPUT</div>
+            <div class="fleet-kpi-value" id="hudAggregatedRps">0.0 RPS</div>
+            <div class="fleet-kpi-sub" id="hudRpsSub">Live cluster request rate</div>
+          </div>
+          <div class="fleet-kpi-item">
+            <div class="fleet-kpi-label">CIRCUIT BREAKER METER</div>
+            <div class="fleet-kpi-value" id="hudBreakerStatus">ARMED</div>
+            <div class="circuit-meter-wrapper">
+              <div class="circuit-meter-fill" id="hudBreakerFill" style="width: 0%;"></div>
+            </div>
+            <div class="circuit-meter-label" id="hudBreakerLabel">0 / 10 Failures (0%)</div>
+          </div>
+        </div>
+
+        <!-- Dynamic Worker Nodes Grid -->
+        <div class="fleet-workers-container" id="fleetWorkersContainer">
+          <!-- Populated dynamically: Worker #1, Worker #2... -->
+        </div>
+      </div>
+
       <div class="terminal-card">
         <div class="terminal-header">
           <div class="terminal-title">

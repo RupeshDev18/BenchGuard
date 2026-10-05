@@ -663,12 +663,37 @@ app.post("/api/pipeline/start", (req, res) => {
 
   activeProcess.stdout.on("data", (data) => {
     const text = data.toString();
-    broadcast("log", { text, stream: "stdout", projectId: currentPipelineMeta.projectId });
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+      if (line.startsWith("[FLEET_TELEMETRY] ")) {
+        try {
+          const payload = JSON.parse(line.slice(18));
+          broadcast("fleet_telemetry", payload);
+        } catch (_) {}
+      }
+    }
+    // Filter out internal IPC tags from user terminal display
+    const userLog = text.replace(/\[FLEET_TELEMETRY\][^\r\n]*(\r?\n)?/g, "");
+    if (userLog.trim()) {
+      broadcast("log", { text: userLog, stream: "stdout", projectId: currentPipelineMeta.projectId });
+    }
   });
 
   activeProcess.stderr.on("data", (data) => {
     const text = data.toString();
-    broadcast("log", { text, stream: "stderr", projectId: currentPipelineMeta.projectId });
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+      if (line.startsWith("[CIRCUIT_BREAKER_TRIPPED] ")) {
+        try {
+          const payload = JSON.parse(line.slice(26));
+          broadcast("circuit_breaker_tripped", payload);
+        } catch (_) {}
+      }
+    }
+    const userLog = text.replace(/\[CIRCUIT_BREAKER_TRIPPED\][^\r\n]*(\r?\n)?/g, "");
+    if (userLog.trim()) {
+      broadcast("log", { text: userLog, stream: "stderr", projectId: currentPipelineMeta.projectId });
+    }
   });
 
   activeProcess.on("close", (code) => {

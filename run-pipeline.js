@@ -88,10 +88,16 @@ async function executeK6Step() {
       scriptPath: loadtestScript,
       outDir,
       configPath,
-      stopOnFailures: configData.stopOnFailures || 0,
+      stopOnFailures: configData.thresholds?.maxFailuresToStop || configData.maxFailuresToStop || configData.stopOnFailures || 0,
       onLog: (text, stream) => {
         if (stream === "stderr") process.stderr.write(text);
         else process.stdout.write(text);
+      },
+      onTelemetry: (snapshot) => {
+        process.stdout.write(`[FLEET_TELEMETRY] ${JSON.stringify(snapshot)}\n`);
+      },
+      onCircuitBreakerTripped: (details) => {
+        process.stderr.write(`[CIRCUIT_BREAKER_TRIPPED] ${JSON.stringify(details)}\n`);
       },
     });
 

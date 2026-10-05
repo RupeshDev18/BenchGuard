@@ -1673,13 +1673,138 @@ function handleWebSocketMessage(msg) {
       updateMockServerUI(msg.data.running);
       break;
 
+    case "fleet_telemetry":
+      updateFleetTelemetryUI(msg.data);
+      break;
+
+    case "circuit_breaker_tripped":
+      handleCircuitBreakerTrippedUI(msg.data);
+      break;
+
     case "log":
       appendLogLine(msg.data.text, msg.data.stream === "stderr" ? "stderr" : "");
       break;
   }
 }
 
+function updateFleetTelemetryUI(data) {
+  if (!data) return;
+  const activeWorkersEl = document.getElementById("hudActiveWorkers");
+  const workersSubEl = document.getElementById("hudWorkersSub");
+  const totalVusEl = document.getElementById("hudTotalVus");
+  const aggregatedRpsEl = document.getElementById("hudAggregatedRps");
+  const breakerStatusEl = document.getElementById("hudBreakerStatus");
+  const breakerFillEl = document.getElementById("hudBreakerFill");
+  const breakerLabelEl = document.getElementById("hudBreakerLabel");
+  const container = document.getElementById("fleetWorkersContainer");
+
+  if (activeWorkersEl) {
+    activeWorkersEl.textContent = `${data.activeWorkersCount || 1} Node${(data.activeWorkersCount || 1) > 1 ? 's' : ''}`;
+  }
+  if (workersSubEl) {
+    workersSubEl.textContent = (data.activeWorkersCount || 1) > 1 ? "Distributed Parallel Fleet" : "Local Runner";
+  }
+  if (totalVusEl) {
+    totalVusEl.textContent = `${data.totalVus || 0} VUs`;
+  }
+  if (aggregatedRpsEl) {
+    aggregatedRpsEl.textContent = `${(data.totalRps || 0).toFixed(1)} RPS`;
+  }
+
+  // Circuit breaker safety meter
+  if (data.enabled && data.limit > 0) {
+    const percent = Math.min(100, Math.max(0, data.thresholdPercent || 0));
+    if (breakerFillEl) {
+      breakerFillEl.style.width = `${percent}%`;
+      if (percent < 50) {
+        breakerFillEl.style.backgroundColor = "#10B981"; // green
+      } else if (percent < 80) {
+        breakerFillEl.style.backgroundColor = "#F59E0B"; // amber
+      } else {
+        breakerFillEl.style.backgroundColor = "#EF4444"; // red
+      }
+    }
+    if (breakerLabelEl) {
+      breakerLabelEl.textContent = `${data.cumulativeErrors} / ${data.limit} Failures (${percent}%)`;
+    }
+    if (breakerStatusEl) {
+      if (data.tripped) {
+        breakerStatusEl.textContent = "TRIPPED";
+        breakerStatusEl.style.color = "#EF4444";
+      } else if (percent >= 80) {
+        breakerStatusEl.textContent = "CRITICAL";
+        breakerStatusEl.style.color = "#EF4444";
+      } else if (percent >= 50) {
+        breakerStatusEl.textContent = "ELEVATED";
+        breakerStatusEl.style.color = "#F59E0B";
+      } else {
+        breakerStatusEl.textContent = "ARMED (OK)";
+        breakerStatusEl.style.color = "#10B981";
+      }
+    }
+  } else {
+    if (breakerStatusEl) {
+      breakerStatusEl.textContent = "DISABLED";
+      breakerStatusEl.style.color = "var(--text-muted)";
+    }
+    if (breakerLabelEl) breakerLabelEl.textContent = "No failure threshold set";
+    if (breakerFillEl) breakerFillEl.style.width = "0%";
+  }
+
+  // Render per-worker cards
+  if (container && Array.isArray(data.workers)) {
+    container.innerHTML = "";
+    data.workers.forEach((w) => {
+      const card = document.createElement("div");
+      card.className = `worker-hud-card ${w.status === 'RUNNING' ? 'active' : ''} ${w.status === 'HALTED' ? 'halted' : ''}`;
+      
+      const hasErrors = (w.errors || 0) > 0;
+      card.innerHTML = `
+        <div class="worker-card-header">
+          <div class="worker-card-name">
+            <span class="status-dot ${w.status === 'RUNNING' ? 'running' : ''}"></span>
+            Worker #${w.id}
+          </div>
+          <span class="worker-card-segment">${w.status || 'READY'}</span>
+        </div>
+        <div class="worker-card-stats">
+          <span>VUs: <strong>${w.vus || 0}</strong></span>
+          <span>RPS: <strong>${(w.rps || 0).toFixed(1)}</strong></span>
+        </div>
+        <div class="worker-card-errors ${hasErrors ? 'has-errors' : ''}">
+          Errors: <strong>${w.errors || 0}</strong>
+          ${w.lastSnippet ? `<div style="font-size: 9px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px;">${escapeHtml(w.lastSnippet)}</div>` : ''}
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+}
+
+function handleCircuitBreakerTrippedUI(data) {
+  const banner = document.getElementById("circuitBreakerTrippedBanner");
+  const subEl = document.getElementById("circuitBreakerTrippedSubtitle");
+  const metaEl = document.getElementById("circuitBreakerTrippedMeta");
+
+  if (banner) banner.classList.remove("hidden");
+  if (subEl) {
+    subEl.textContent = `Cumulative failures across cluster reached safety threshold (${data.cumulativeErrors || 0} failures >= ${data.limit || 0} limit).`;
+  }
+  if (metaEl) {
+    const elapsed = data.breachedAtElapsedMs ? `${(data.breachedAtElapsedMs / 1000).toFixed(2)}s` : '0.0s';
+    metaEl.innerHTML = `
+      Triggered by <strong>Worker #${data.triggerWorkerId || 1}</strong> at +${elapsed} elapsed.<br/>
+      All distributed worker processes were terminated simultaneously.
+    `;
+  }
+
+  showToast(`🛑 Circuit Breaker Tripped! (${data.cumulativeErrors}/${data.limit} errors). Fleet aborted.`, "error", "Circuit Breaker");
+}
+
 function setPipelineRunningState(isRunning) {
+  if (isRunning) {
+    document.getElementById("circuitBreakerTrippedBanner")?.classList.add("hidden");
+  }
   const statusDot = document.getElementById("pipelineStatusDot");
   const statusText = document.getElementById("pipelineStatusText");
   const timer = document.getElementById("pipelineTimer");
