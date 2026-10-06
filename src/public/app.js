@@ -116,6 +116,7 @@ const ROUTES = {
   "/": { tab: "overview", title: "Platform Overview", icon: "🏠", category: "Core Testing" },
   "/studio": { tab: "studio", title: "Test Studio (Load)", icon: "⚡", category: "Core Testing" },
   "/console": { tab: "console", title: "Live Console", icon: "🖥️", category: "Core Testing" },
+  "/fleet": { tab: "fleet", title: "Worker Fleet & Nodes", icon: "🌐", category: "Core Testing" },
   "/schedules": { tab: "schedules", title: "Cron Schedules", icon: "⏰", category: "Automation & Reliability" },
   "/alarms": { tab: "alarms", title: "Alarms & Webhooks", icon: "🚨", category: "Automation & Reliability" },
   "/reports/executive": { tab: "managementReport", title: "Executive SLA Report", icon: "📊", category: "Observability & Reports" },
@@ -131,13 +132,16 @@ const ROUTE_ALIASES = {
   "/overview": "/",
   "/reports": "/reports/executive",
   "/report": "/reports/executive",
-  "/allure": "/reports/allure"
+  "/allure": "/reports/allure",
+  "/nodes": "/fleet",
+  "/workers": "/fleet"
 };
 
 const TAB_TO_ROUTE = {
   "overview": "/",
   "studio": "/studio",
   "console": "/console",
+  "fleet": "/fleet",
   "schedules": "/schedules",
   "alarms": "/alarms",
   "managementReport": "/reports/executive",
@@ -248,6 +252,9 @@ function onRouteEnter(tabName) {
       break;
     case "studio":
       drawLoadCurve();
+      break;
+    case "fleet":
+      loadFleetWorkers();
       break;
     case "schedules":
       loadSchedules();
@@ -474,6 +481,15 @@ function populateForm(cfg) {
     }
   });
   updateWorkerSelectorNote(workers);
+
+  if (cfg.distributedMode) {
+    const modeSel = document.getElementById("distributedModeSelector");
+    if (modeSel) modeSel.value = cfg.distributedMode;
+  }
+  if (cfg.region !== undefined) {
+    const regSel = document.getElementById("distributedRegionSelector");
+    if (regSel) regSel.value = cfg.region;
+  }
 
   drawLoadCurve();
 }
@@ -1539,6 +1555,11 @@ function collectConfigFromUI() {
   const workersCount = activeWorkerBtn ? parseInt(activeWorkerBtn.dataset.workers, 10) : 1;
   cfg.workersCount = workersCount || 1;
 
+  const modeSel = document.getElementById("distributedModeSelector");
+  if (modeSel) cfg.distributedMode = modeSel.value;
+  const regSel = document.getElementById("distributedRegionSelector");
+  if (regSel && regSel.value) cfg.region = regSel.value;
+
   return cfg;
 }
 
@@ -1679,6 +1700,21 @@ function handleWebSocketMessage(msg) {
 
     case "circuit_breaker_tripped":
       handleCircuitBreakerTrippedUI(msg.data);
+      break;
+
+    case "fleet_worker_registered":
+      showToast(`Worker ${msg.data.id} (${msg.data.region}) connected to fleet!`, "info", "Fleet Agent");
+      loadFleetWorkers();
+      break;
+
+    case "fleet_worker_disconnected":
+      showToast(`Worker ${msg.data.id} disconnected from fleet.`, "warning", "Fleet Agent");
+      loadFleetWorkers();
+      break;
+
+    case "fleet_worker_unresponsive":
+    case "fleet_worker_recovered":
+      loadFleetWorkers();
       break;
 
     case "log":
@@ -3742,6 +3778,186 @@ async function loadWebhooks() {
 // Call initialization at DOM ready
 document.addEventListener("DOMContentLoaded", () => {
   initSchedulesAndWebhooksUI();
+  initFleetUI();
 });
+
+// -------------------------------------------------------------
+// Fleet & Cloud Nodes UI Management (Phase 3)
+// -------------------------------------------------------------
+function initFleetUI() {
+  const refreshBtn = document.getElementById("refreshFleetBtn");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      loadFleetWorkers(true);
+    });
+  }
+
+  const haltBtn = document.getElementById("emergencyHaltFleetBtn");
+  if (haltBtn) {
+    haltBtn.addEventListener("click", async () => {
+      if (!confirm("⚠️ Emergency Halt: Are you sure you want to immediately kill all running load tests across all distributed worker nodes?")) {
+        return;
+      }
+      try {
+        const res = await fetch("/api/fleet/workers/halt", {
+          method: "POST",
+          headers: getAuthHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ reason: "Emergency halt from Fleet Dashboard" })
+        });
+        const data = await res.json();
+        showToast(`Emergency halt signal broadcast to ${data.haltedCount || 0} active workers!`, "error", "Fleet Halted");
+        loadFleetWorkers();
+      } catch (err) {
+        showToast("Failed to broadcast halt signal: " + err.message, "error");
+      }
+    });
+  }
+
+  // Initial fetch of fleet nodes
+  loadFleetWorkers();
+}
+
+async function loadFleetWorkers(isManualRefresh = false) {
+  try {
+    const res = await fetch("/api/fleet/workers");
+    if (!res.ok) return;
+    const data = await res.json();
+    renderFleetWorkers(data.workers || []);
+    if (isManualRefresh) {
+      showToast(`Fleet refreshed: ${data.workers?.length || 0} active worker nodes.`, "info", "Fleet Synced");
+    }
+  } catch (err) {
+    console.warn("[FleetUI] Failed loading fleet workers:", err.message);
+  }
+}
+
+function renderFleetWorkers(workers = []) {
+  // Update sidebar badge
+  const sidebarBadge = document.getElementById("sidebarFleetCountBadge");
+  if (sidebarBadge) {
+    sidebarBadge.textContent = `${workers.length} ${workers.length === 1 ? 'Node' : 'Nodes'}`;
+    sidebarBadge.className = workers.length > 0 ? "nav-badge badge-primary" : "nav-badge badge-subtle";
+  }
+
+  // Update KPI counters
+  const sumNodes = document.getElementById("fleetSummaryNodes");
+  if (sumNodes) sumNodes.textContent = `${workers.length} ${workers.length === 1 ? 'Node' : 'Nodes'}`;
+
+  const sumCapacity = document.getElementById("fleetSummaryCapacity");
+  const totalCap = workers.reduce((acc, w) => acc + (w.maxVusCapacity || 500), 0);
+  if (sumCapacity) sumCapacity.textContent = `${totalCap.toLocaleString()} VUs`;
+
+  const uniqueRegions = new Set(workers.map(w => w.region || "default"));
+  const sumRegions = document.getElementById("fleetSummaryRegions");
+  if (sumRegions) sumRegions.textContent = `${uniqueRegions.size} ${uniqueRegions.size === 1 ? 'Region' : 'Regions'}`;
+
+  const healthyCount = workers.filter(w => w.status !== "UNRESPONSIVE" && w.status !== "OFFLINE").length;
+  const healthPct = workers.length > 0 ? Math.round((healthyCount / workers.length) * 100) : 100;
+  const sumLiveness = document.getElementById("fleetSummaryLiveness");
+  if (sumLiveness) {
+    sumLiveness.textContent = `${healthPct}% Healthy`;
+    sumLiveness.className = `fleet-kpi-val ${healthPct >= 90 ? 'text-emerald' : healthPct >= 60 ? 'text-amber' : 'text-crimson'}`;
+  }
+
+  // Render Nodes Grid
+  const grid = document.getElementById("fleetNodesGrid");
+  if (!grid) return;
+
+  if (workers.length === 0) {
+    grid.innerHTML = `
+      <div class="fleet-empty-state" id="fleetEmptyState">
+        <div style="font-size: 32px; margin-bottom: 12px;">🌐</div>
+        <div style="font-weight: 600; font-size: 14px; color: var(--text);">No Remote Worker Agents Connected Yet</div>
+        <div style="font-size: 12px; color: var(--text-muted); max-width: 480px; margin: 8px auto 16px;">
+          Tests will automatically execute on local processes until container agents connect. Run our ready-made Docker agent or Compose cluster to scale across cloud regions!
+        </div>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('deployQuickstartGuide').scrollIntoView({ behavior: 'smooth' })">
+          View Docker Deployment Commands ↓
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  // Region flag helpers
+  const getRegionBadge = (region) => {
+    let flag = "🌐";
+    if (region.includes("us-east") || region.includes("us-west")) flag = "🇺🇸";
+    else if (region.includes("eu-west") || region.includes("eu-central")) flag = "🇪🇺";
+    else if (region.includes("ap-south")) flag = "🇮🇳";
+    else if (region.includes("ap-east") || region.includes("ap-northeast")) flag = "🇯🇵";
+    return `<span class="fleet-node-region-badge">${flag} ${region}</span>`;
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case "IDLE":
+        return `<span class="badge badge-success">IDLE • Ready</span>`;
+      case "EXECUTING":
+      case "ASSIGNED":
+        return `<span class="badge badge-primary pulse">EXECUTING</span>`;
+      case "UNRESPONSIVE":
+        return `<span class="badge badge-warning">UNRESPONSIVE</span>`;
+      case "OFFLINE":
+        return `<span class="badge badge-danger">OFFLINE</span>`;
+      default:
+        return `<span class="badge badge-subtle">${status}</span>`;
+    }
+  };
+
+  grid.innerHTML = workers.map(w => {
+    const statusClass = `status-${(w.status || 'idle').toLowerCase()}`;
+    const cpu = w.cpuUsagePercent || 0;
+    const mem = w.memoryUsagePercent || 0;
+    const ping = w.pingLatencyMs || 1;
+    const connTime = new Date(w.connectedAt).toLocaleTimeString();
+
+    return `
+      <div class="fleet-node-card ${statusClass}">
+        <div class="fleet-node-header">
+          <div>
+            <div class="fleet-node-id">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+              <span>${escapeHtml(w.id)}</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+              Host: ${escapeHtml(w.hostname || 'container')} • ${escapeHtml(w.platform || 'linux')} (${w.cpus || 2} CPU, ${w.memoryMb || 2048}MB)
+            </div>
+          </div>
+          <div>
+            ${getStatusBadge(w.status)}
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center;">
+          ${getRegionBadge(w.region || 'us-east-1')}
+          <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-muted);">
+            ⚡ Latency: <strong style="color: var(--text);">${ping}ms</strong>
+          </span>
+        </div>
+
+        <div class="fleet-node-metrics-row">
+          <div class="fleet-metric-item">
+            <span class="f-lbl">CPU Load</span>
+            <span class="f-val">${cpu}%</span>
+          </div>
+          <div class="fleet-metric-item">
+            <span class="f-lbl">Memory Used</span>
+            <span class="f-val">${mem}%</span>
+          </div>
+          <div class="fleet-metric-item" style="grid-column: 1 / -1; margin-top: 4px;">
+            <span class="f-lbl">Allocated Capacity</span>
+            <span class="f-val" style="color: var(--primary);">${(w.maxVusCapacity || 500).toLocaleString()} VUs</span>
+          </div>
+        </div>
+
+        <div class="fleet-node-footer">
+          <span>Connected: ${connTime}</span>
+          <span>Heartbeat: <strong style="color: #10B981;">Active</strong></span>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
 
 

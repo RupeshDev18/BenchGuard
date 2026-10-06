@@ -23,6 +23,14 @@ const orgRoutes = require("./src/routes/org-routes");
 const projectRoutes = require("./src/routes/project-routes");
 const broadcaster = require("./src/utils/broadcaster");
 const { initScheduler } = require("./src/scheduler/cron-scheduler");
+const workerRegistry = require("./src/distributed/worker-registry");
+
+// Forward fleet registry events to WebSocket clients
+workerRegistry.on("worker_registered", (w) => broadcaster.broadcast("fleet_worker_registered", w));
+workerRegistry.on("worker_disconnected", (w) => broadcaster.broadcast("fleet_worker_disconnected", w));
+workerRegistry.on("worker_unresponsive", (w) => broadcaster.broadcast("fleet_worker_unresponsive", w));
+workerRegistry.on("worker_recovered", (w) => broadcaster.broadcast("fleet_worker_recovered", w));
+workerRegistry.on("worker_telemetry", (data) => broadcaster.broadcast("fleet_worker_telemetry", data));
 
 const app = express();
 const server = http.createServer(app);
@@ -1097,19 +1105,53 @@ app.get("/api/reports/status", (req, res) => {
   });
 });
 
+// Fleet Management Endpoints
+app.get("/api/fleet/workers", (req, res) => {
+  res.json({
+    workers: workerRegistry.getAllWorkers(),
+    count: workerRegistry.workers.size
+  });
+});
+
+app.post("/api/fleet/workers/halt", (req, res) => {
+  const { reason } = req.body || {};
+  const count = workerRegistry.haltAllWorkers(reason || "Manual emergency halt from dashboard");
+  res.json({ success: true, haltedCount: count });
+});
+
 // Fallback to index.html
 app.get("*", (req, res) => {
   res.sendFile(path.join(ROOT_DIR, "src/public/index.html"));
 });
 
 // WebSocket Connection Handler
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
+  const url = (req && req.url) ? req.url : "/";
+  if (url.startsWith("/ws/worker-fleet")) {
+    const host = (req.headers && req.headers.host) || "localhost";
+    let secret = req.headers ? req.headers["x-benchguard-secret"] : null;
+    let region = "us-east-1";
+    let workerId = null;
+
+    try {
+      const parsedUrl = new URL(url, `http://${host}`);
+      secret = secret || parsedUrl.searchParams.get("secret");
+      region = parsedUrl.searchParams.get("region") || region;
+      workerId = parsedUrl.searchParams.get("workerId") || null;
+    } catch (_) {}
+
+    workerRegistry.register(ws, { secret, region, workerId });
+    return;
+  }
+
+  // Dashboard browser client
   ws.send(JSON.stringify({ 
     type: "init", 
     data: { 
       running: pipelineRunning, 
       mockRunning: mockServerRunning,
-      dbStatus: db.getDbStatus()
+      dbStatus: db.getDbStatus(),
+      fleetWorkers: workerRegistry.getAllWorkers()
     } 
   }));
 });

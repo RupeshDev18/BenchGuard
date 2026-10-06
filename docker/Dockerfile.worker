@@ -1,0 +1,42 @@
+# -------------------------------------------------------------
+# BenchGuard Distributed Worker Agent Dockerfile
+# Standalone Container Image packaging k6 Engine + Node.js Runner Agent
+# -------------------------------------------------------------
+
+# Stage 1: Obtain k6 binary from official Grafana k6 image
+FROM grafana/k6:latest AS k6-source
+
+# Stage 2: Final lightweight Node.js container
+FROM node:20-alpine
+
+LABEL maintainer="BenchGuard Distributed Engineering"
+LABEL description="Containerized BenchGuard Load Generator Worker Agent"
+
+# Copy k6 binary from Stage 1
+COPY --from=k6-source /usr/bin/k6 /usr/local/bin/k6
+
+# Ensure k6 is executable and install ca-certificates
+RUN apk add --no-cache ca-certificates bash curl \
+    && chmod +x /usr/local/bin/k6
+
+WORKDIR /app
+
+# Install dependencies (only ws needed for agent)
+COPY package.json package-lock.json* ./
+RUN npm install --only=production ws
+
+# Copy agent implementation
+COPY src/distributed/remote-worker-agent.js ./src/distributed/
+
+# Default Environment Variables
+ENV BENCHGUARD_MASTER_URL="ws://benchguard-master:3000/ws/worker-fleet" \
+    BENCHGUARD_AGENT_SECRET="benchguard-fleet-secret-2026" \
+    BENCHGUARD_REGION="us-east-1" \
+    BENCHGUARD_MAX_VUS=1000 \
+    K6_BIN="/usr/local/bin/k6"
+
+# Healthcheck testing WebSocket connection to Master
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+  CMD k6 version || exit 1
+
+ENTRYPOINT ["node", "src/distributed/remote-worker-agent.js"]

@@ -1,0 +1,28 @@
+# -------------------------------------------------------------
+# BenchGuard Master Hub & Dashboard Server Dockerfile
+# -------------------------------------------------------------
+
+FROM node:20-alpine
+
+LABEL maintainer="BenchGuard Distributed Engineering"
+LABEL description="BenchGuard Central Coordinator, Dashboard, and Fleet Hub"
+
+# Install k6 binary for optional local worker execution
+RUN apk add --no-cache ca-certificates bash curl \
+    && curl -L -o /usr/local/bin/k6 https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz 2>/dev/null || true \
+    && if [ -f /usr/local/bin/k6 ]; then tar -xzf /usr/local/bin/k6 -C /usr/local/bin --strip-components=1 2>/dev/null || true; fi
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install --only=production
+
+COPY . .
+
+ENV PORT=3000 \
+    NODE_ENV=production \
+    BENCHGUARD_AGENT_SECRET="benchguard-fleet-secret-2026"
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]

@@ -57,6 +57,11 @@
             <span class="nav-label">Live Console</span>
             <span class="nav-badge badge-live" id="consoleLiveBadge">Live</span>
           </a>
+          <a href="/fleet" class="nav-item" data-nav-route="/fleet">
+            <span class="nav-icon">🌐</span>
+            <span class="nav-label">Worker Fleet & Nodes</span>
+            <span class="nav-badge badge-primary" id="sidebarFleetCountBadge">0 Nodes</span>
+          </a>
         </div>
 
         <!-- Group 2: Automation & Reliability -->
@@ -819,6 +824,25 @@
                   <button type="button" class="pill-option" data-workers="4">4 Workers (Quad)</button>
                   <button type="button" class="pill-option" data-workers="8">8 Workers (Swarm)</button>
                 </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                  <div>
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Target Orchestration</label>
+                    <select id="distributedModeSelector" class="select-control" style="width: 100%; font-size: 12px; padding: 4px 8px;">
+                      <option value="auto">Auto (Remote Fleet if available, else Local)</option>
+                      <option value="remote">Remote Container Fleet Only</option>
+                      <option value="local">Local Machine Processes Only</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Preferred Cloud Region</label>
+                    <select id="distributedRegionSelector" class="select-control" style="width: 100%; font-size: 12px; padding: 4px 8px;">
+                      <option value="">Any Available Region</option>
+                      <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                      <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                      <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+                    </select>
+                  </div>
+                </div>
                 <div id="workerDistributionNote" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 8px;">
                   Execution: 100% of VUs executed on Worker #1 (Segment: 0:1).
                 </div>
@@ -1253,6 +1277,128 @@
         </div>
         <div class="terminal-output" id="terminalOutput">
           <div class="log-line text-muted">[system] Console initialized. Ready to stream test execution logs...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB: WORKER FLEET & CLOUD NODES (/fleet)
+         ==================================================================== -->
+    <section id="tab-fleet" class="tab-content" data-route="/fleet">
+      <!-- Page Header -->
+      <div class="page-header accent-indigo">
+        <div class="page-header-info">
+          <div class="page-header-top">
+            <span class="page-header-tag">CLOUD ORCHESTRATION</span>
+            <span class="badge badge-primary">Phase 3 Fleet</span>
+          </div>
+          <h1 class="page-header-title">Worker Fleet & Cloud Nodes</h1>
+          <p class="page-header-desc">
+            Supervise distributed container agents, multi-region cluster health, heartbeat latencies, and remote capacity.
+          </p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-secondary" id="refreshFleetBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            Refresh Fleet
+          </button>
+          <button type="button" class="btn btn-danger" id="emergencyHaltFleetBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            Emergency Halt All
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Fleet Summary Cards -->
+      <div class="fleet-kpi-grid">
+        <div class="fleet-kpi-card">
+          <div class="fleet-kpi-label">Registered Worker Nodes</div>
+          <div class="fleet-kpi-val text-primary" id="fleetSummaryNodes">0 Nodes</div>
+          <div class="fleet-kpi-sub" id="fleetSummaryNodesSub">Auto-discovering via WebSocket</div>
+        </div>
+        <div class="fleet-kpi-card">
+          <div class="fleet-kpi-label">Total Remote VU Capacity</div>
+          <div class="fleet-kpi-val text-emerald" id="fleetSummaryCapacity">0 VUs</div>
+          <div class="fleet-kpi-sub">Across all connected regions</div>
+        </div>
+        <div class="fleet-kpi-card">
+          <div class="fleet-kpi-label">Fleet Liveness Status</div>
+          <div class="fleet-kpi-val text-amber" id="fleetSummaryLiveness">100% Healthy</div>
+          <div class="fleet-kpi-sub">5s WebSocket Heartbeat loop</div>
+        </div>
+        <div class="fleet-kpi-card">
+          <div class="fleet-kpi-label">Active Cloud Regions</div>
+          <div class="fleet-kpi-val text-indigo" id="fleetSummaryRegions">0 Regions</div>
+          <div class="fleet-kpi-sub" id="fleetSummaryRegionsSub">us-east, eu-west, ap-south</div>
+        </div>
+      </div>
+
+      <!-- Nodes Grid Container -->
+      <div class="card" style="margin-top: 20px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="card-title">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            Active Fleet Nodes
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+            Master Hub: <span class="text-primary">ws://localhost:3000/ws/worker-fleet</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="fleet-nodes-grid" id="fleetNodesGrid">
+            <!-- Dynamically populated or empty state -->
+            <div class="fleet-empty-state" id="fleetEmptyState">
+              <div style="font-size: 32px; margin-bottom: 12px;">🌐</div>
+              <div style="font-weight: 600; font-size: 14px; color: var(--text);">No Remote Worker Agents Connected Yet</div>
+              <div style="font-size: 12px; color: var(--text-muted); max-width: 480px; margin: 8px auto 16px;">
+                Tests will automatically execute on local processes until container agents connect. Run our ready-made Docker agent or Compose cluster to scale across cloud regions!
+              </div>
+              <button type="button" class="btn btn-primary" onclick="document.getElementById('deployQuickstartGuide').scrollIntoView({ behavior: 'smooth' })">
+                View Docker Deployment Commands ↓
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quickstart Deployment Guide -->
+      <div class="card" id="deployQuickstartGuide" style="margin-top: 24px;">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 17l6-6-6-6m8 14h8"></path></svg>
+            Deploy Worker Agents (Docker & CLI Commands)
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+            <div class="quickstart-box">
+              <div class="quickstart-box-title">Option A: Single Standalone Docker Agent</div>
+              <div class="quickstart-box-desc">Run an isolated load generator container pointing to this BenchGuard Master Hub:</div>
+              <div class="code-snippet-box">
+                <code>docker run -d --name bg-worker-us-east \<br/>
+  -e BENCHGUARD_MASTER_URL="ws://host.docker.internal:3000/ws/worker-fleet" \<br/>
+  -e BENCHGUARD_REGION="us-east-1" \<br/>
+  -e BENCHGUARD_AGENT_SECRET="benchguard-fleet-secret-2026" \<br/>
+  benchguard-worker:latest</code>
+              </div>
+            </div>
+
+            <div class="quickstart-box">
+              <div class="quickstart-box-title">Option B: Multi-Region Cluster via Docker Compose</div>
+              <div class="quickstart-box-desc">Spin up Master + 3 Worker Nodes (US, EU, AP) + Target API in one command:</div>
+              <div class="code-snippet-box">
+                <code>docker compose -f docker-compose.distributed.yml up -d --build</code>
+              </div>
+            </div>
+
+            <div class="quickstart-box">
+              <div class="quickstart-box-title">Option C: Local CLI Worker Agent (No Docker Required)</div>
+              <div class="quickstart-box-desc">Launch a native Node.js + k6 worker agent on any machine:</div>
+              <div class="code-snippet-box">
+                <code>node src/distributed/remote-worker-agent.js --region ap-south-1 --master ws://localhost:3000/ws/worker-fleet</code>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

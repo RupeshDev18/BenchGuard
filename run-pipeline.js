@@ -89,6 +89,8 @@ async function executeK6Step() {
       outDir,
       configPath,
       stopOnFailures: configData.thresholds?.maxFailuresToStop || configData.maxFailuresToStop || configData.stopOnFailures || 0,
+      distributedMode: configData.distributedMode || "auto",
+      preferredRegion: configData.region || null,
       onLog: (text, stream) => {
         if (stream === "stderr") process.stderr.write(text);
         else process.stdout.write(text);

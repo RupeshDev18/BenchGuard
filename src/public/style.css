@@ -3063,6 +3063,206 @@ canvas {
   color: #EF4444;
 }
 
+/* ==========================================================================
+   Fleet & Cloud Nodes Page Styles (Phase 3)
+   ========================================================================== */
+.fleet-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.fleet-kpi-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.fleet-kpi-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.fleet-kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.fleet-kpi-val {
+  font-size: 26px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  line-height: 1.1;
+}
+
+.fleet-kpi-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Nodes Grid */
+.fleet-nodes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.fleet-node-card {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.fleet-node-card:hover {
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow);
+}
+
+.fleet-node-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--border);
+}
+
+.fleet-node-card.status-idle::before { background-color: #10B981; }
+.fleet-node-card.status-executing::before { background-color: var(--primary); }
+.fleet-node-card.status-unresponsive::before { background-color: #F59E0B; }
+.fleet-node-card.status-offline::before { background-color: #EF4444; }
+
+.fleet-node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.fleet-node-id {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fleet-node-region-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fleet-node-metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.fleet-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fleet-metric-item .f-lbl {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.fleet-metric-item .f-val {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.fleet-node-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.fleet-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 24px;
+  background-color: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+/* Quickstart Snippet Boxes */
+.quickstart-box {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quickstart-box-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quickstart-box-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.code-snippet-box {
+  background-color: #0b0f19;
+  border: 1px solid #1f293d;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: #93c5fd;
+  overflow-x: auto;
+  user-select: all;
+}
+
 
 
 

@@ -1,9 +1,9 @@
 /**
  * worker-pool.js
  *
- * Local Multi-Process Worker Pool for BenchGuard Distributed Load Testing.
- * Spawns multiple k6 child processes across CPU cores, slices execution segments,
- * supervises cumulative circuit breakers, and consolidates final reports.
+ * Hybrid Multi-Process & Remote Container Worker Pool for BenchGuard Distributed Load Testing.
+ * Orchestrates test execution across local CPU cores or remote containerized worker nodes,
+ * slices execution segments, supervises cumulative circuit breakers, and consolidates final reports.
  */
 
 const { spawn } = require("child_process");
@@ -11,6 +11,7 @@ const path = require("path");
 const fs = require("fs");
 const { mergeMetrics } = require("./metrics-consolidator");
 const { CircuitBreakerCoordinator } = require("./circuit-breaker-coordinator");
+const workerRegistry = require("./worker-registry");
 
 class WorkerPool {
   constructor(options = {}) {
@@ -19,6 +20,8 @@ class WorkerPool {
     this.outDir = options.outDir || path.resolve(process.cwd(), "report-output");
     this.configPath = options.configPath;
     this.stopOnFailures = options.stopOnFailures || 0;
+    this.distributedMode = options.distributedMode || "auto"; // "auto" | "remote" | "local"
+    this.preferredRegion = options.preferredRegion || null;
     this.onLog = options.onLog || (() => {});
     this.onStatus = options.onStatus || (() => {});
     this.onTelemetry = options.onTelemetry || (() => {});
@@ -28,6 +31,7 @@ class WorkerPool {
     this.activeProcesses = [];
     this.isAborting = false;
     this.completedWorkers = 0;
+    this.isRemote = false;
 
     // Initialize the synchronized global coordinator
     this.coordinator = new CircuitBreakerCoordinator({
@@ -40,88 +44,243 @@ class WorkerPool {
 
   async run() {
     return new Promise((resolve, reject) => {
-      console.log(`\n[WorkerPool] Initializing distributed fleet with ${this.workersCount} worker nodes...`);
-      this.onLog(`[WorkerPool] Initializing distributed fleet with ${this.workersCount} worker nodes...\n`, "stdout");
-
-      if (!fs.existsSync(this.outDir)) {
-        fs.mkdirSync(this.outDir, { recursive: true });
+      // Check for available remote container workers
+      let remoteCandidates = [];
+      if (this.distributedMode === "remote" || this.distributedMode === "auto") {
+        remoteCandidates = workerRegistry.getAvailableWorkers(this.workersCount, this.preferredRegion);
       }
 
-      const workerSummaryFiles = [];
+      if (this.distributedMode === "remote" && remoteCandidates.length === 0) {
+        return reject(new Error("Remote distributed mode requested, but no remote worker agents are registered or idle."));
+      }
 
-      for (let i = 0; i < this.workersCount; i++) {
-        const workerId = i + 1;
-        const startSeg = `${i}/${this.workersCount}`;
-        const endSeg = `${i + 1}/${this.workersCount}`;
-        const executionSegment = `${startSeg}:${endSeg}`;
-        const summaryFile = path.join(this.outDir, `worker-${workerId}-summary.json`);
-        workerSummaryFiles.push(summaryFile);
+      if (remoteCandidates.length > 0 && this.distributedMode !== "local") {
+        this.isRemote = true;
+        this.runRemote(remoteCandidates, resolve, reject);
+      } else {
+        this.runLocal(resolve, reject);
+      }
+    });
+  }
 
-        // Clean any old summary
-        if (fs.existsSync(summaryFile)) {
-          try { fs.unlinkSync(summaryFile); } catch (_) {}
+  /**
+   * Run using remote container worker agents
+   */
+  runRemote(remoteWorkers, resolve, reject) {
+    const totalWorkers = remoteWorkers.length;
+    console.log(`\n[WorkerPool] Launching distributed run across ${totalWorkers} REMOTE CONTAINER WORKER NODES...`);
+    this.onLog(`[WorkerPool] Launching distributed run across ${totalWorkers} REMOTE CONTAINER WORKER NODES...\n`, "stdout");
+
+    if (!fs.existsSync(this.outDir)) {
+      fs.mkdirSync(this.outDir, { recursive: true });
+    }
+
+    const workerSummaryFiles = [];
+    const scriptContent = fs.readFileSync(this.scriptPath, "utf8");
+    const testJobBatchId = `job-${Date.now()}`;
+
+    // Listener cleanup helper
+    const cleanupListeners = [];
+
+    remoteWorkers.forEach((workerNode, idx) => {
+      const workerId = idx + 1;
+      const remoteId = workerNode.id;
+      const startSeg = `${idx}/${totalWorkers}`;
+      const endSeg = `${idx + 1}/${totalWorkers}`;
+      const executionSegment = `${startSeg}:${endSeg}`;
+      const summaryFile = path.join(this.outDir, `worker-${workerId}-summary.json`);
+      workerSummaryFiles.push(summaryFile);
+
+      if (fs.existsSync(summaryFile)) {
+        try { fs.unlinkSync(summaryFile); } catch (_) {}
+      }
+
+      this.workers.push({ id: workerId, remoteId, summaryFile, exitCode: null, segment: executionSegment });
+      this.coordinator.updateWorkerMetrics(workerId, { status: "RUNNING" });
+
+      console.log(`[WorkerPool] Dispatching segment ${executionSegment} to remote agent ${remoteId} (${workerNode.region})...`);
+      this.onLog(`[WorkerPool] Dispatching segment ${executionSegment} to remote agent ${remoteId} (${workerNode.region})...\n`, "stdout");
+
+      // Wire registry events for this worker
+      const onWorkerLog = (evt) => {
+        if (evt.workerId === remoteId && evt.jobId.startsWith(testJobBatchId)) {
+          this.onLog(`[Worker-${workerId} @ ${workerNode.region}] ${evt.data}`, evt.stream || "stdout");
         }
+      };
 
-        const args = [
-          "run",
-          `--summary-export="${summaryFile}"`,
-          `--execution-segment=${executionSegment}`,
-          `"${this.scriptPath}"`,
-        ];
+      const onWorkerTelemetry = (evt) => {
+        if (evt.workerId === remoteId && evt.jobId.startsWith(testJobBatchId)) {
+          if (evt.telemetry) {
+            this.coordinator.updateWorkerMetrics(workerId, {
+              vus: evt.telemetry.vus,
+              rps: evt.telemetry.rps,
+            });
+          }
+        }
+      };
 
-        console.log(`[WorkerPool] Spawning Worker #${workerId} (segment: ${executionSegment})...`);
-        this.onLog(`[WorkerPool] Spawning Worker #${workerId} (segment: ${executionSegment})...\n`, "stdout");
-
-        const proc = spawn("k6", args, {
-          shell: true,
-          cwd: path.dirname(this.scriptPath),
-          env: {
-            ...process.env,
-            BENCHGUARD_WORKER_ID: String(workerId),
-            BENCHGUARD_TOTAL_WORKERS: String(this.workersCount),
-          },
-        });
-
-        this.activeProcesses.push(proc);
-        this.workers.push({ id: workerId, proc, summaryFile, exitCode: null, segment: executionSegment });
-        this.coordinator.updateWorkerMetrics(workerId, { status: "RUNNING" });
-
-        proc.stdout.on("data", (data) => {
-          const text = data.toString();
-          this.onLog(`[Worker-${workerId}] ${text}`, "stdout");
-          this.parseWorkerTelemetry(workerId, text);
-        });
-
-        proc.stderr.on("data", (data) => {
-          const text = data.toString();
-          this.onLog(`[Worker-${workerId}] ${text}`, "stderr");
-          this.parseWorkerTelemetry(workerId, text);
-        });
-
-        proc.on("close", (code) => {
+      const onJobCompleted = (evt) => {
+        if (evt.workerId === remoteId && evt.jobId.startsWith(testJobBatchId)) {
           this.completedWorkers++;
           const w = this.workers.find((item) => item.id === workerId);
-          if (w) w.exitCode = code;
+          if (w) w.exitCode = evt.exitCode ?? 0;
 
-          const finalStatus = this.isAborting ? "HALTED" : (code === 0 ? "COMPLETED" : "FAILED");
+          if (evt.summary) {
+            fs.writeFileSync(summaryFile, JSON.stringify(evt.summary, null, 2), "utf8");
+          }
+
+          const finalStatus = this.isAborting ? "HALTED" : (evt.exitCode === 0 ? "COMPLETED" : "FAILED");
           this.coordinator.updateWorkerMetrics(workerId, { status: finalStatus });
 
-          this.onLog(`[WorkerPool] Worker #${workerId} finished with exit code ${code} (${this.completedWorkers}/${this.workersCount} done)\n`, "stdout");
+          this.onLog(`[WorkerPool] Remote Worker #${workerId} (${remoteId}) finished (code ${evt.exitCode}) [${this.completedWorkers}/${totalWorkers} done]\n`, "stdout");
 
-          if (this.completedWorkers >= this.workersCount) {
+          if (this.completedWorkers >= totalWorkers) {
+            cleanupListeners.forEach(fn => fn());
             this.finalize(workerSummaryFiles, resolve, reject);
           }
-        });
+        }
+      };
 
-        proc.on("error", (err) => {
-          this.coordinator.updateWorkerMetrics(workerId, { status: "ERROR" });
-          this.onLog(`[WorkerPool] Error in Worker #${workerId}: ${err.message}\n`, "stderr");
-        });
+      const onJobFailed = (evt) => {
+        if (evt.workerId === remoteId && evt.jobId.startsWith(testJobBatchId)) {
+          this.completedWorkers++;
+          const w = this.workers.find((item) => item.id === workerId);
+          if (w) w.exitCode = evt.exitCode ?? 1;
+
+          this.coordinator.updateWorkerMetrics(workerId, { status: "FAILED" });
+          this.onLog(`[WorkerPool] Remote Worker #${workerId} failed: ${evt.error}\n`, "stderr");
+
+          if (this.completedWorkers >= totalWorkers) {
+            cleanupListeners.forEach(fn => fn());
+            this.finalize(workerSummaryFiles, resolve, reject);
+          }
+        }
+      };
+
+      const onCircuitBreaker = (evt) => {
+        if (evt.workerId === remoteId && evt.jobId.startsWith(testJobBatchId)) {
+          this.coordinator.recordErrors(workerId, evt.errorsCount || 1, evt.reason || "Remote threshold breach");
+        }
+      };
+
+      workerRegistry.on("worker_log", onWorkerLog);
+      workerRegistry.on("worker_telemetry", onWorkerTelemetry);
+      workerRegistry.on("job_completed", onJobCompleted);
+      workerRegistry.on("job_failed", onJobFailed);
+      workerRegistry.on("circuit_breaker_triggered", onCircuitBreaker);
+
+      cleanupListeners.push(() => {
+        workerRegistry.removeListener("worker_log", onWorkerLog);
+        workerRegistry.removeListener("worker_telemetry", onWorkerTelemetry);
+        workerRegistry.removeListener("job_completed", onJobCompleted);
+        workerRegistry.removeListener("job_failed", onJobFailed);
+        workerRegistry.removeListener("circuit_breaker_triggered", onCircuitBreaker);
+      });
+
+      // Dispatch payload to worker
+      const jobPayload = {
+        jobId: `${testJobBatchId}-w${workerId}`,
+        scriptContent,
+        segment: executionSegment,
+        vus: 0,
+        envVars: {
+          BENCHGUARD_WORKER_ID: String(workerId),
+          BENCHGUARD_TOTAL_WORKERS: String(totalWorkers)
+        }
+      };
+
+      workerRegistry.dispatchJob(remoteId, jobPayload);
+    });
+
+    // Initial telemetry snapshot
+    this.onTelemetry(this.coordinator.getFleetSnapshot());
+  }
+
+  /**
+   * Run using local child processes
+   */
+  runLocal(resolve, reject) {
+    console.log(`\n[WorkerPool] Initializing local multi-process fleet with ${this.workersCount} worker nodes...`);
+    this.onLog(`[WorkerPool] Initializing local multi-process fleet with ${this.workersCount} worker nodes...\n`, "stdout");
+
+    if (!fs.existsSync(this.outDir)) {
+      fs.mkdirSync(this.outDir, { recursive: true });
+    }
+
+    const workerSummaryFiles = [];
+
+    for (let i = 0; i < this.workersCount; i++) {
+      const workerId = i + 1;
+      const startSeg = `${i}/${this.workersCount}`;
+      const endSeg = `${i + 1}/${this.workersCount}`;
+      const executionSegment = `${startSeg}:${endSeg}`;
+      const summaryFile = path.join(this.outDir, `worker-${workerId}-summary.json`);
+      workerSummaryFiles.push(summaryFile);
+
+      // Clean any old summary
+      if (fs.existsSync(summaryFile)) {
+        try { fs.unlinkSync(summaryFile); } catch (_) {}
       }
 
-      // Initial telemetry broadcast
-      this.onTelemetry(this.coordinator.getFleetSnapshot());
-    });
+      const args = [
+        "run",
+        `--summary-export="${summaryFile}"`,
+        `--execution-segment=${executionSegment}`,
+        `"${this.scriptPath}"`,
+      ];
+
+      console.log(`[WorkerPool] Spawning Worker #${workerId} (segment: ${executionSegment})...`);
+      this.onLog(`[WorkerPool] Spawning Worker #${workerId} (segment: ${executionSegment})...\n`, "stdout");
+
+      const proc = spawn("k6", args, {
+        shell: true,
+        cwd: path.dirname(this.scriptPath),
+        env: {
+          ...process.env,
+          BENCHGUARD_WORKER_ID: String(workerId),
+          BENCHGUARD_TOTAL_WORKERS: String(this.workersCount),
+        },
+      });
+
+      this.activeProcesses.push(proc);
+      this.workers.push({ id: workerId, proc, summaryFile, exitCode: null, segment: executionSegment });
+      this.coordinator.updateWorkerMetrics(workerId, { status: "RUNNING" });
+
+      proc.stdout.on("data", (data) => {
+        const text = data.toString();
+        this.onLog(`[Worker-${workerId}] ${text}`, "stdout");
+        this.parseWorkerTelemetry(workerId, text);
+      });
+
+      proc.stderr.on("data", (data) => {
+        const text = data.toString();
+        this.onLog(`[Worker-${workerId}] ${text}`, "stderr");
+        this.parseWorkerTelemetry(workerId, text);
+      });
+
+      proc.on("close", (code) => {
+        this.completedWorkers++;
+        const w = this.workers.find((item) => item.id === workerId);
+        if (w) w.exitCode = code;
+
+        const finalStatus = this.isAborting ? "HALTED" : (code === 0 ? "COMPLETED" : "FAILED");
+        this.coordinator.updateWorkerMetrics(workerId, { status: finalStatus });
+
+        this.onLog(`[WorkerPool] Worker #${workerId} finished with exit code ${code} (${this.completedWorkers}/${this.workersCount} done)\n`, "stdout");
+
+        if (this.completedWorkers >= this.workersCount) {
+          this.finalize(workerSummaryFiles, resolve, reject);
+        }
+      });
+
+      proc.on("error", (err) => {
+        this.coordinator.updateWorkerMetrics(workerId, { status: "ERROR" });
+        this.onLog(`[WorkerPool] Error in Worker #${workerId}: ${err.message}\n`, "stderr");
+      });
+    }
+
+    // Initial telemetry broadcast
+    this.onTelemetry(this.coordinator.getFleetSnapshot());
   }
 
   parseWorkerTelemetry(workerId, text) {
@@ -148,7 +307,7 @@ class WorkerPool {
       });
     }
 
-    // 3. Inspect for real runtime failure patterns (avoiding summary metric labels like http_req_failed)
+    // 3. Inspect for real runtime failure patterns
     const isSummaryLine = /http_req_failed|checks_failed\.*:\s*0|checks_failed\.*:\s*0\.00%/i.test(text);
     if (!isSummaryLine) {
       const failedCheckCount = (text.match(/✗/g) || []).length;
@@ -171,13 +330,15 @@ class WorkerPool {
     console.warn(`🚨 Triggered by Worker #${details.triggerWorkerId}`);
 
     this.onLog(`\n🚨 [WorkerPool] GLOBAL CIRCUIT BREAKER TRIPPED: Cumulative failures breached safety limit (${details.cumulativeErrors} >= ${details.limit})!\n`, "stderr");
-    this.onLog(`🚨 Halting all ${this.activeProcesses.length} workers in parallel...\n`, "stderr");
-
-    // Immediate parallel termination of all workers
-    for (const proc of this.activeProcesses) {
-      try {
-        proc.kill();
-      } catch (_) {}
+    
+    if (this.isRemote) {
+      this.onLog(`🚨 Broadcasting emergency HALT signal to all remote container workers...\n`, "stderr");
+      workerRegistry.haltAllWorkers(`Circuit breaker tripped on master (${details.cumulativeErrors} errors)`);
+    } else {
+      this.onLog(`🚨 Halting all ${this.activeProcesses.length} local workers in parallel...\n`, "stderr");
+      for (const proc of this.activeProcesses) {
+        try { proc.kill(); } catch (_) {}
+      }
     }
 
     this.onCircuitBreakerTripped(details);
@@ -187,10 +348,13 @@ class WorkerPool {
     if (this.isAborting) return;
     this.isAborting = true;
     this.onLog(`\n[WorkerPool] Aborting distributed fleet by user request...\n`, "stderr");
-    for (const proc of this.activeProcesses) {
-      try {
-        proc.kill();
-      } catch (_) {}
+    
+    if (this.isRemote) {
+      workerRegistry.haltAllWorkers("Aborted by user request");
+    } else {
+      for (const proc of this.activeProcesses) {
+        try { proc.kill(); } catch (_) {}
+      }
     }
   }
 
@@ -227,7 +391,6 @@ class WorkerPool {
     console.log(`[WorkerPool] Successfully wrote consolidated metrics to ${finalSummaryPath}`);
     this.onLog(`[WorkerPool] Successfully wrote consolidated metrics to ${finalSummaryPath}\n`, "stdout");
 
-    // Any worker failed?
     const hasFailures = this.workers.some((w) => w.exitCode !== 0);
 
     resolve({

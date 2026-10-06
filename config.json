@@ -33,6 +33,8 @@
     ],
     "exclude": []
   },
+  "workersCount": 2,
+  "distributedMode": "auto",
   "contractTesting": {
     "enabled": true,
     "checks": [

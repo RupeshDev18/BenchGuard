@@ -1,0 +1,103 @@
+version: "3.8"
+
+services:
+  # -------------------------------------------------------------
+  # 1. BenchGuard Master Hub & Management Dashboard
+  # -------------------------------------------------------------
+  benchguard-master:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.master
+    container_name: benchguard-master
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - BENCHGUARD_AGENT_SECRET=benchguard-fleet-secret-2026
+      - DATABASE_URL=postgres://benchguard:benchguard_pass@postgres:5432/benchguard_db
+    depends_on:
+      - mock-target-api
+    networks:
+      - benchguard-fleet-net
+    restart: unless-stopped
+
+  # -------------------------------------------------------------
+  # 2. Mock API (Target for load testing simulations)
+  # -------------------------------------------------------------
+  mock-target-api:
+    image: node:20-alpine
+    container_name: benchguard-mock-api
+    working_dir: /app
+    volumes:
+      - ./src/mock-server:/app/src/mock-server
+      - ./sample-openapi.json:/app/sample-openapi.json
+    ports:
+      - "8080:8080"
+    command: ["node", "src/mock-server/mock-api.js"]
+    networks:
+      - benchguard-fleet-net
+    restart: unless-stopped
+
+  # -------------------------------------------------------------
+  # 3. Distributed Worker Agent 1: US East Region
+  # -------------------------------------------------------------
+  worker-us-east:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: benchguard-worker-us-east
+    environment:
+      - BENCHGUARD_MASTER_URL=ws://benchguard-master:3000/ws/worker-fleet
+      - BENCHGUARD_AGENT_SECRET=benchguard-fleet-secret-2026
+      - BENCHGUARD_REGION=us-east-1
+      - BENCHGUARD_WORKER_ID=worker-us-east-1-node-01
+      - BENCHGUARD_MAX_VUS=1000
+    depends_on:
+      - benchguard-master
+    networks:
+      - benchguard-fleet-net
+    restart: unless-stopped
+
+  # -------------------------------------------------------------
+  # 4. Distributed Worker Agent 2: EU West Region
+  # -------------------------------------------------------------
+  worker-eu-west:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: benchguard-worker-eu-west
+    environment:
+      - BENCHGUARD_MASTER_URL=ws://benchguard-master:3000/ws/worker-fleet
+      - BENCHGUARD_AGENT_SECRET=benchguard-fleet-secret-2026
+      - BENCHGUARD_REGION=eu-west-1
+      - BENCHGUARD_WORKER_ID=worker-eu-west-1-node-01
+      - BENCHGUARD_MAX_VUS=1000
+    depends_on:
+      - benchguard-master
+    networks:
+      - benchguard-fleet-net
+    restart: unless-stopped
+
+  # -------------------------------------------------------------
+  # 5. Distributed Worker Agent 3: AP South Region
+  # -------------------------------------------------------------
+  worker-ap-south:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: benchguard-worker-ap-south
+    environment:
+      - BENCHGUARD_MASTER_URL=ws://benchguard-master:3000/ws/worker-fleet
+      - BENCHGUARD_AGENT_SECRET=benchguard-fleet-secret-2026
+      - BENCHGUARD_REGION=ap-south-1
+      - BENCHGUARD_WORKER_ID=worker-ap-south-1-node-01
+      - BENCHGUARD_MAX_VUS=1000
+    depends_on:
+      - benchguard-master
+    networks:
+      - benchguard-fleet-net
+    restart: unless-stopped
+
+networks:
+  benchguard-fleet-net:
+    driver: bridge
